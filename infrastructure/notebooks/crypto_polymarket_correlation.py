@@ -8,15 +8,15 @@ app = marimo.App(width="full")
 def _():
     import marimo as mo
     mo.md("""
-    # Crypto × Polymarket Correlation Analysis
+    # Analyse de Corrélation Crypto × Polymarket
 
-    Comparing **Polymarket prediction-market probabilities** for crypto events
-    against spot prices from **Coinbase** and **Kraken**.
+    Comparaison des **probabilités des marchés prédictifs Polymarket** pour les événements crypto
+    avec les prix au comptant de **Coinbase** et **Kraken**.
 
-    Data sources:
-    - **Coinbase**: BTC/USD, ETH/USD — daily bars back to 2013
-    - **Kraken**: BTC/USD, ETH/USD, SOL/USD — daily bars (~2 years)
-    - **Polymarket**: 505 crypto-related markets (YES-token probability 0–1, hourly → resampled daily)
+    Sources de données :
+    - **Coinbase** : BTC/USD, ETH/USD — barres journalières depuis 2013
+    - **Kraken** : BTC/USD, ETH/USD, SOL/USD — barres journalières (~2 ans)
+    - **Polymarket** : 505 marchés liés aux cryptos (probabilité du jeton YES 0–1, horaire → rééchantillonné quotidiennement)
     """)
     return (mo,)
 
@@ -30,11 +30,13 @@ def _(mo):
     import matplotlib.dates as mdates
     import re
 
-    CRYPTO_ROOT = pathlib.Path("~/Documents/Q-agent/infrastructure/pipelines/crypto/lean-data/crypto")
-    POLY_ROOT   = pathlib.Path("~/Documents/Q-agent/infrastructure/pipelines/polymarket/lean-data/alternative/polymarket")
+    INFRA_ROOT = pathlib.Path(__file__).resolve().parents[1]
+    CRYPTO_ROOT = INFRA_ROOT / "pipelines" / "crypto" / "lean-data" / "crypto"
+    POLY_ROOT = INFRA_ROOT / "pipelines" / "polymarket" / "lean-data" / "alternative" / "polymarket"
+    YFINANCE_DAILY = INFRA_ROOT / "pipelines" / "yfinance" / "lean-data" / "equity" / "usa" / "daily"
 
     def read_lean_zip(path: pathlib.Path) -> pd.DataFrame:
-        """Read a LEAN-format daily zip: headerless YYYYMMDD 00:00,O,H,L,C,V."""
+        """Lit un zip LEAN quotidien : YYYYMMDD 00:00,O,H,L,C,V sans en-tête."""
         with zipfile.ZipFile(path) as z:
             df = pd.read_csv(
                 z.open(z.namelist()[0]),
@@ -45,14 +47,51 @@ def _(mo):
         df["date"] = pd.to_datetime(df["datetime"].dt.date)
         return df.set_index("date")
 
-    mo.md("✅ Imports and helpers loaded.")
-    return CRYPTO_ROOT, POLY_ROOT, mdates, pd, plt, re, read_lean_zip
+    mo.md("✅ Imports et fonctions utilitaires chargés.")
+    return CRYPTO_ROOT, POLY_ROOT, YFINANCE_DAILY, mdates, pathlib, pd, plt, re, read_lean_zip
+
+
+@app.cell(hide_code=True)
+def _(CRYPTO_ROOT, POLY_ROOT, YFINANCE_DAILY, mo):
+    _expected_crypto = [
+        CRYPTO_ROOT / "coinbasepro" / "daily" / "btcusd.zip",
+        CRYPTO_ROOT / "coinbasepro" / "daily" / "ethusd.zip",
+        CRYPTO_ROOT / "kraken" / "daily" / "btcusd.zip",
+        CRYPTO_ROOT / "kraken" / "daily" / "ethusd.zip",
+        CRYPTO_ROOT / "kraken" / "daily" / "solusd.zip",
+    ]
+    _expected_poly = [
+        POLY_ROOT / "markets.csv",
+        POLY_ROOT / "prices",
+    ]
+    _optional_equity = YFINANCE_DAILY / "coin.zip"
+    _missing = [p for p in _expected_crypto + _expected_poly if not p.exists()]
+    _optional_status = "present" if _optional_equity.exists() else "not present"
+    _kind = "warn" if _missing else "info"
+    _missing_lines = "\n".join(f"- `{p}`" for p in _missing) or "- None"
+
+    mo.callout(
+        mo.md(f"""
+        **Data availability check**
+
+        This notebook expects local pipeline outputs that are intentionally not committed to GitHub.
+        If you just cloned the repository, the notebook still opens, but charts and tables that depend
+        on local market data may be empty until you generate or copy the data.
+
+        Missing required local inputs:
+        {_missing_lines}
+
+        Optional COIN equity file: `{_optional_equity}` ({_optional_status}).
+        """),
+        kind=_kind,
+    )
+    return
 
 
 @app.cell(hide_code=True)
 def _(mo):
     mo.md("""
-    ## 1. Crypto OHLCV
+    ## 1. OHLCV Crypto
     """)
     return
 
@@ -74,7 +113,12 @@ def _(CRYPTO_ROOT, mo, pd, read_lean_zip):
             _frames[(exchange, asset)] = read_lean_zip(path)["close"].rename(f"{exchange}_{asset}")
 
     # Merged close-price table (each column = exchange_asset)
-    prices = pd.concat(_frames.values(), axis=1).sort_index()
+    _price_columns = ["coinbase_BTC", "coinbase_ETH", "kraken_BTC", "kraken_ETH", "kraken_SOL"]
+    prices = (
+        pd.concat(_frames.values(), axis=1).sort_index()
+        if _frames
+        else pd.DataFrame({col: pd.Series(dtype=float) for col in _price_columns})
+    )
 
     # Summary
     _summary = pd.DataFrame([
@@ -94,7 +138,7 @@ def _(CRYPTO_ROOT, mo, pd, read_lean_zip):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md("""
-    ## 2. Polymarket Crypto Markets
+    ## 2. Marchés Polymarket Crypto
     """)
     return
 
@@ -102,7 +146,8 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(POLY_ROOT, mo, pd, re):
     markets_path = POLY_ROOT / "markets.csv"
-    markets = pd.read_csv(markets_path) if markets_path.exists() else pd.DataFrame()
+    _market_columns = ["Slug", "Question", "Volume", "YesTokenId", "Theme"]
+    markets = pd.read_csv(markets_path) if markets_path.exists() else pd.DataFrame(columns=_market_columns)
 
     if not markets.empty:
         _theme_patterns = {
@@ -133,16 +178,16 @@ def _(POLY_ROOT, mo, pd, re):
             .reset_index()
         )
         _overview["TotalVolume"] = _overview["TotalVolume"].map("${:,.0f}".format)
-        mo.ui.table(_overview, show_column_summaries=False)
+        _ = mo.ui.table(_overview, show_column_summaries=False)
     else:
-        mo.callout(mo.md("⚠️ `markets.csv` not found."), kind="warn")
+        _ = mo.callout(mo.md("⚠️ `markets.csv` not found."), kind="warn")
     return (markets,)
 
 
 @app.cell(hide_code=True)
 def _(mo):
     mo.md("""
-    ## 3. Available Polymarket Price Histories
+    ## 3. Historiques de Prix Polymarket Disponibles
     """)
     return
 
@@ -157,8 +202,8 @@ def _(POLY_ROOT, markets, mo):
     _n_loaded = len(price_files_on_disk)
 
     mo.md(f"""
-    **{_n_loaded}** price files on disk out of **{_n_total}** markets with a YES token
-    *(prices pipeline may still be running — reload to see more)*
+    **{_n_loaded}** fichiers de prix sur disque sur **{_n_total}** marchés avec un jeton YES
+    *(le pipeline de prix est peut-être encore en cours — rechargez pour en voir plus)*
     """)
     return price_files_on_disk, prices_dir
 
@@ -182,12 +227,12 @@ def _(pd, prices_dir):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md("""
-    ## 4. ETH Merge Analysis
+    ## 4. Analyse de la Fusion Ethereum
 
-    The Ethereum Merge (EIP-3675) occurred on **September 15, 2022**, transitioning
-    from Proof-of-Work to Proof-of-Stake. Polymarket ran several markets on whether
-    the merge would happen by specific dates. We examine whether probability changes
-    preceded ETH spot moves.
+    La Fusion Ethereum (EIP-3675) a eu lieu le **15 septembre 2022**, faisant la transition
+    de la Preuve de Travail à la Preuve d'Enjeu. Polymarket a lancé plusieurs marchés sur la
+    probabilité que la fusion ait lieu avant des dates précises. Nous examinons si les variations
+    de probabilité ont précédé les mouvements du cours ETH au comptant.
     """)
     return
 
@@ -198,7 +243,7 @@ def _(load_poly_prices, markets, mo, pd, price_files_on_disk):
     _merge_markets = markets[markets["Theme"] == "ETH_merge"].copy()
     _merge_on_disk  = _merge_markets[_merge_markets["Slug"].isin(price_files_on_disk)]
 
-    # Check for actual price variation (CLOB only returns post-resolution flat prices for old resolved markets)
+    # Vérifie la variation réelle des prix (le CLOB retourne des prix plats post-résolution pour les vieux marchés)
     _live_merge = []
     for _, row in _merge_on_disk.iterrows():
         s = load_poly_prices(row["Slug"])
@@ -206,17 +251,17 @@ def _(load_poly_prices, markets, mo, pd, price_files_on_disk):
             _live_merge.append(row["Slug"])
 
     if _live_merge:
-        mo.md("**ETH Merge price series available.**")
+        _ = mo.md("**Séries de prix de la Fusion ETH disponibles.**")
     else:
-        mo.callout(mo.md("""
-    **ETH Merge historical data unavailable via CLOB API.**
+        _ = mo.callout(mo.md("""
+    **Données historiques de la Fusion ETH indisponibles via l'API CLOB.**
 
-    The Polymarket CLOB price-history endpoint only retains data from ~late 2022 onwards,
-    and all the Merge markets resolved in 2022. The API returns a flat post-resolution
-    price (0.5) for these old markets — no pre-event probability series is accessible.
+    L'endpoint d'historique de prix Polymarket CLOB ne conserve des données qu'à partir de fin 2022,
+    et tous les marchés de la Fusion ont été résolus en 2022. L'API retourne un prix plat post-résolution
+    (0,5) pour ces anciens marchés — aucune série de probabilités pré-événement n'est accessible.
 
-    The analysis below focuses on **active 2025–2026 price-target markets** where rich
-    probability histories are available.
+    L'analyse ci-dessous se concentre sur les **marchés actifs à objectif de prix 2025–2026**
+    pour lesquels de riches historiques de probabilités sont disponibles.
     """), kind="info")
     return
 
@@ -224,11 +269,11 @@ def _(load_poly_prices, markets, mo, pd, price_files_on_disk):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md("""
-    ## 5. Crypto Price-Target Markets vs Spot Prices
+    ## 5. Marchés Objectifs de Prix Crypto vs Prix au Comptant
 
-    These are "Will X reach $Y by date Z?" markets — the YES probability reflects
-    the market's collective view on whether the target will be hit.
-    Higher BTC spot → higher P(BTC hits $150k).
+    Ce sont des marchés de type « X atteindra-t-il $Y avant la date Z ? » — la probabilité YES reflète
+    la vision collective du marché sur l'atteinte ou non de l'objectif.
+    Plus le prix BTC au comptant est élevé → plus P(BTC atteint 150 k$) est élevée.
     """)
     return
 
@@ -280,12 +325,12 @@ def _(load_poly_prices, mdates, plt, price_files_on_disk, prices):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md("""
-    ## 6. Correlation: Does Probability Lead or Lag Price?
+    ## 6. Corrélation : La Probabilité Précède-t-elle ou Suit-elle le Prix ?
 
-    For each price-target market, we compute:
-    - **Level correlation**: Pearson r between daily YES probability and spot price
-    - **1-day lead**: does today's probability change predict tomorrow's return?
-    - **1-day lag**: does today's return predict tomorrow's probability change?
+    Pour chaque marché à objectif de prix, nous calculons :
+    - **Corrélation de niveau** : r de Pearson entre la probabilité YES quotidienne et le prix au comptant
+    - **Avance d'un jour** : la variation de probabilité d'aujourd'hui prédit-elle le rendement de demain ?
+    - **Retard d'un jour** : le rendement d'aujourd'hui prédit-il la variation de probabilité de demain ?
     """)
     return
 
@@ -332,7 +377,8 @@ def _(load_poly_prices, mo, pd, price_files_on_disk, prices):
             "r(ret→nextΔprob)": round(_r_lag, 3),
         })
 
-    corr_table = pd.DataFrame(_rows)
+    _corr_columns = ["Asset", "Market", "N", "r(prob~spot)", "r(Δprob→nextRet)", "r(ret→nextΔprob)"]
+    corr_table = pd.DataFrame(_rows, columns=_corr_columns)
     mo.ui.table(corr_table, show_column_summaries=False)
     return (corr_table,)
 
@@ -340,7 +386,7 @@ def _(load_poly_prices, mo, pd, price_files_on_disk, prices):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md("""
-    ## 7. Cross-Exchange Price Comparison (Coinbase vs Kraken)
+    ## 7. Comparaison des Prix Entre Exchanges (Coinbase vs Kraken)
     """)
     return
 
@@ -358,6 +404,10 @@ def _(mdates, pd, plt, prices):
 
         # Price overlay
         _ax = _axes[_i, 0]
+        if _aligned.empty:
+            _ax.text(0.5, 0.5, "No local price data", ha="center", va="center", transform=_ax.transAxes)
+            _axes[_i, 1].text(0.5, 0.5, "No local price data", ha="center", va="center", transform=_axes[_i, 1].transAxes)
+            continue
         _ax.plot(_aligned.index, _aligned["CB"], lw=1, label="Coinbase", color="#3b82f6", alpha=0.8)
         _ax.plot(_aligned.index, _aligned["KR"], lw=1, label="Kraken", color="#f59e0b", alpha=0.8, ls="--")
         _ax.set_title(f"{_name}/USD — Close Price", fontweight="bold")
@@ -387,6 +437,94 @@ def _(mdates, pd, plt, prices):
 
 
 @app.cell(hide_code=True)
+def _(mo):
+    mo.md("""
+    ## 8. Action Coinbase (COIN) vs Prix Crypto
+
+    Comparaison du cours de l'action Coinbase (COIN) avec les prix au comptant BTC et ETH
+    pour évaluer à quel point le titre suit les cycles crypto.
+    """)
+    return
+
+
+@app.cell
+def _(YFINANCE_DAILY, mdates, pd, plt, prices):
+    import zipfile as _zf
+
+    _coin_path = YFINANCE_DAILY / "coin.zip"
+    if _coin_path.exists():
+        with _zf.ZipFile(_coin_path) as _z:
+            _coin_df = pd.read_csv(
+                _z.open(_z.namelist()[0]),
+                header=None,
+                names=["datetime","open","high","low","close","volume"],
+                parse_dates=["datetime"],
+            )
+        _coin_df["date"] = pd.to_datetime(_coin_df["datetime"].dt.date)
+        coin = _coin_df.set_index("date")["close"] / 10000  # LEAN stores cents
+    else:
+        coin = pd.Series(dtype=float, name="COIN")
+
+    _btc = prices["coinbase_BTC"].dropna()
+    _eth = prices["coinbase_ETH"].dropna()
+
+    _fig_coin, _axes_coin = plt.subplots(3, 1, figsize=(13, 11), sharex=True)
+
+    # --- BTC vs COIN ---
+    _ax_btc = _axes_coin[0]
+    _ax_coin1 = _ax_btc.twinx()
+    _ax_btc.plot(_btc.index, _btc.values, color="#f59e0b", lw=1.5, label="BTC/USD (Coinbase)")
+    _ax_coin1.plot(coin.index, coin.values, color="#3b82f6", lw=1.5, alpha=0.8, label="COIN")
+    _ax_btc.set_ylabel("BTC/USD", color="#f59e0b")
+    _ax_coin1.set_ylabel("COIN ($)", color="#3b82f6")
+    _ax_btc.tick_params(axis="y", colors="#f59e0b")
+    _ax_coin1.tick_params(axis="y", colors="#3b82f6")
+    _l1, _lb1 = _ax_btc.get_legend_handles_labels()
+    _l2, _lb2 = _ax_coin1.get_legend_handles_labels()
+    _ax_btc.legend(_l1+_l2, _lb1+_lb2, fontsize=8, loc="upper left")
+    _ax_btc.set_title("BTC/USD vs COIN", fontweight="bold")
+    _ax_btc.yaxis.set_major_formatter(plt.FuncFormatter(lambda x,_: f"${x:,.0f}"))
+    _ax_coin1.yaxis.set_major_formatter(plt.FuncFormatter(lambda x,_: f"${x:,.0f}"))
+
+    # --- ETH vs COIN ---
+    _ax_eth = _axes_coin[1]
+    _ax_coin2 = _ax_eth.twinx()
+    _ax_eth.plot(_eth.index, _eth.values, color="#10b981", lw=1.5, label="ETH/USD (Coinbase)")
+    _ax_coin2.plot(coin.index, coin.values, color="#3b82f6", lw=1.5, alpha=0.8, label="COIN")
+    _ax_eth.set_ylabel("ETH/USD", color="#10b981")
+    _ax_coin2.set_ylabel("COIN ($)", color="#3b82f6")
+    _ax_eth.tick_params(axis="y", colors="#10b981")
+    _ax_coin2.tick_params(axis="y", colors="#3b82f6")
+    _l3, _lb3 = _ax_eth.get_legend_handles_labels()
+    _l4, _lb4 = _ax_coin2.get_legend_handles_labels()
+    _ax_eth.legend(_l3+_l4, _lb3+_lb4, fontsize=8, loc="upper left")
+    _ax_eth.set_title("ETH/USD vs COIN", fontweight="bold")
+    _ax_eth.yaxis.set_major_formatter(plt.FuncFormatter(lambda x,_: f"${x:,.0f}"))
+    _ax_coin2.yaxis.set_major_formatter(plt.FuncFormatter(lambda x,_: f"${x:,.0f}"))
+
+    # --- Rolling 60-day correlation COIN vs BTC ---
+    _ax_corr = _axes_coin[2]
+    _aligned_cb = pd.concat([coin.rename("COIN"), _btc.rename("BTC"), _eth.rename("ETH")], axis=1, sort=True).dropna()
+    _roll_btc = _aligned_cb["COIN"].rolling(60).corr(_aligned_cb["BTC"])
+    _roll_eth = _aligned_cb["COIN"].rolling(60).corr(_aligned_cb["ETH"])
+    _ax_corr.plot(_roll_btc.index, _roll_btc.values, color="#f59e0b", lw=1.5, label="r(COIN, BTC) 60j")
+    _ax_corr.plot(_roll_eth.index, _roll_eth.values, color="#10b981", lw=1.5, label="r(COIN, ETH) 60j")
+    _ax_corr.axhline(0, color="gray", ls="--", lw=0.8)
+    _ax_corr.set_ylabel("Corrélation glissante (60j)")
+    _ax_corr.set_ylim(-1, 1)
+    _ax_corr.set_title("Corrélation glissante COIN vs BTC & ETH (60 jours)", fontweight="bold")
+    _ax_corr.xaxis.set_major_formatter(mdates.DateFormatter("%b %Y"))
+    _ax_corr.xaxis.set_major_locator(mdates.MonthLocator(interval=4))
+    plt.setp(_ax_corr.xaxis.get_majorticklabels(), rotation=30, ha="right")
+    _ax_corr.legend(fontsize=8)
+
+    _fig_coin.suptitle("Action Coinbase (COIN) vs Prix Crypto au Comptant", fontsize=12, fontweight="bold")
+    plt.tight_layout()
+    plt.gca()
+    return
+
+
+@app.cell(hide_code=True)
 def _(corr_table, mo):
     _btc_r = corr_table[corr_table["Asset"]=="BTC"]["r(prob~spot)"].mean()
     _eth_r = corr_table[corr_table["Asset"]=="ETH"]["r(prob~spot)"].mean()
@@ -396,39 +534,39 @@ def _(corr_table, mo):
     _lag_r  = corr_table["r(ret→nextΔprob)"].mean()
 
     mo.md(f"""
-    ## 8. Key Findings
+    ## 8. Conclusions Clés
 
-    ### Price-Level Correlation (Polymarket vs Spot)
-    | Asset | r(prob ~ spot) |
-    |-------|---------------|
+    ### Corrélation de Niveau de Prix (Polymarket vs Comptant)
+    | Actif | r(prob ~ comptant) |
+    |-------|-------------------|
     | BTC   | {_btc_r:.3f} |
     | ETH   | {_eth_r:.3f} |
     | SOL   | {_sol_r:.3f} |
 
-    All extremely high (0.92–0.97) — probabilities track spot price closely, as expected
-    for price-target markets.
+    Toutes extrêmement élevées (0,92–0,97) — les probabilités suivent de près le prix au comptant,
+    comme prévu pour les marchés à objectif de prix.
 
-    ### Lead-Lag: Who moves first?
+    ### Avance-Retard : Qui bouge en premier ?
 
-    | Direction | Mean r |
-    |-----------|--------|
-    | Δprob today → return tomorrow (PM leads price) | {_lead_r:.3f} |
-    | return today → Δprob tomorrow (price leads PM)  | {_lag_r:.3f} |
+    | Direction | r moyen |
+    |-----------|---------|
+    | Δprob aujourd'hui → rendement demain (PM précède le prix) | {_lead_r:.3f} |
+    | rendement aujourd'hui → Δprob demain (le prix précède PM)  | {_lag_r:.3f} |
 
-    **Spot price leads Polymarket, not the other way around.**
-    A +1% exchange return today predicts +{_lag_r:.2f} std Polymarket probability move tomorrow
-    (average across markets). Polymarket probability changes have essentially zero predictive
-    power for next-day exchange returns.
+    **Le prix au comptant précède Polymarket, et non l'inverse.**
+    Un rendement exchange de +1 % aujourd'hui prédit un mouvement de probabilité Polymarket de +{_lag_r:.2f} std demain
+    (moyenne sur les marchés). Les variations de probabilité Polymarket ont un pouvoir prédictif
+    quasi nul sur les rendements exchange du lendemain.
 
-    ### Cross-Exchange (Coinbase vs Kraken)
-    Correlation is extremely high (>0.999999). Any short-term spread is noise-level and
-    not arbitrageable given transaction costs.
+    ### Inter-Exchanges (Coinbase vs Kraken)
+    La corrélation est extrêmement élevée (>0,999999). Tout écart à court terme est du bruit
+    et ne peut être arbitragé compte tenu des coûts de transaction.
 
     ### Implications
-    - Polymarket crypto event markets are **reactive**, not leading indicators.
-    - Price-target probabilities are essentially a monotone transformation of spot price.
-    - For alpha signals, you would need markets where Polymarket traders have an
-      information edge — regulatory or event markets, not pure price-level bets.
+    - Les marchés d'événements crypto Polymarket sont **réactifs**, pas des indicateurs avancés.
+    - Les probabilités des objectifs de prix sont essentiellement une transformation monotone du prix au comptant.
+    - Pour des signaux alpha, il faudrait des marchés où les traders Polymarket ont un
+      avantage informationnel — marchés réglementaires ou événementiels, pas de simples paris sur le niveau de prix.
     """)
     return
 

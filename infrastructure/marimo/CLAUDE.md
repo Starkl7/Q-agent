@@ -2,9 +2,9 @@
 
 ## Purpose
 
-Shared marimo environment for signal research. The venv here is used by any notebook in the workspace — typically `examples/`, this directory's `notebooks/`, or `MyProjects/<Project>/research/*.py`.
+Shared marimo environment for signal research. The venv here is used by any notebook in the workspace — typically this directory's `notebooks/`, `infrastructure/notebooks/`, or `MyProjects/<Project>/research/*.py`.
 
-Data sources live alongside this directory under `infrastructure/pipelines/wrds/` and `infrastructure/pipelines/edgar/`.
+Data sources live under `infrastructure/pipelines/`.
 
 ## Workflow
 
@@ -13,12 +13,12 @@ Start a marimo session, then use `/marimo-pair` to collaborate:
 ```bash
 cd ~/Documents/Q-agent/infrastructure/marimo
 source venv/bin/activate
-marimo edit examples/signal_research.py --no-token
+marimo edit notebooks/election_industry_returns.py --no-token
 ```
 
 Then invoke the skill:
 ```
-/marimo-pair pair with me on signal_research.py
+/marimo-pair pair with me on election_industry_returns.py
 ```
 
 ## Rules
@@ -26,7 +26,7 @@ Then invoke the skill:
 - **Never edit `.py` notebook files directly while a marimo session is running.** Use `ctx.edit_cell()` / `ctx.create_cell()` via code_mode. Direct file writes are silently lost.
 - Install packages via `ctx.packages.add()`, not `pip` or `uv add`.
 - Keep signal logic pure Python (no LEAN imports) so it can graduate to `shared/signals/`.
-- Data paths should reference `../wrds/lean-data/` (from `infrastructure/marimo/`) or use `pathlib` — no hardcoded absolute paths in cells.
+- Data paths should reference `../pipelines/...` (from `infrastructure/marimo/`) or use `pathlib` — no hardcoded absolute paths in cells.
 - No temp-file dependencies in cells (`/tmp/...` in cell code is a bug).
 
 ## Plot Styling

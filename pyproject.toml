@@ -1,0 +1,16 @@
+[tool.pytest.ini_options]
+minversion = "7.0"
+testpaths = ["tests"]
+pythonpath = [
+    ".",
+    "infrastructure/pipelines/yfinance/src",
+]
+addopts = [
+    "-ra",
+    "--strict-markers",
+    "--strict-config",
+]
+markers = [
+    "integration: tests requiring live services (Neo4j, Chroma, QuantConnect cloud, LEAN CLI). Skipped in CI by default.",
+    "slow: tests that take more than a few seconds.",
+]
