@@ -88,40 +88,9 @@ The goal is to keep the composition root thin, isolate orchestration logic, and 
 
 See [docs/architecture.md](docs/architecture.md) for the full architecture guide.
 
-## Quick Start
+## Getting Started
 
-### 1. Clone the Repository
-
-```bash
-cd ~/Documents
-git clone https://github.com/WolfpackOfOne/Q-agent.git Q-agent
-cd Q-agent
-```
-
-### 2. Create a Python Environment
-
-```bash
-python3 -m venv venv
-source venv/bin/activate
-pip install --upgrade pip
-pip install lean
-```
-
-### 3. Configure QuantConnect LEAN CLI
-
-```bash
-cd MyProjects
-lean init
-lean login
-```
-
-Do not commit `lean.json`, API keys, local credentials, or local data files.
-
-### 4. Verify the Setup
-
-```bash
-lean --version
-```
+See [GETTING_STARTED.md](GETTING_STARTED.md) for setup instructions and how to run the example notebooks.
 
 ## Daily Workflow
 
@@ -135,22 +104,20 @@ lean cloud backtest "<ProjectName>" --name "Description"
 
 ## Research Examples
 
-This workspace is especially useful for projects that combine multiple data sources. Example research directions include:
+Two runnable notebooks are included:
 
-- WRDS equity returns combined with EDGAR fundamentals
-- WRDS equity returns combined with Piotroski F-Score metrics
-- ETF constituent history combined with fund-level liquidity diagnostics
-- Polymarket probabilities combined with crypto or ETF returns
-- EDGAR fundamentals combined with profitability and quality signals
-- QuantConnect backtest outputs combined with notebook-based risk analysis
+| Notebook | Data sources | Local data required |
+|---|---|---|
+| [Election & Industry Returns](infrastructure/marimo/notebooks/election_industry_returns.py) | Polymarket CLOB API, Kenneth French data library | No — fetches live. WRDS global factor overlay is optional. |
+| [Crypto & Polymarket Correlation](infrastructure/notebooks/crypto_polymarket_correlation.py) | Coinbase, Kraken, Polymarket prices | Yes — run the crypto and Polymarket pipelines first. |
 
-See [docs/research-examples.md](docs/research-examples.md) for detailed project ideas.
+See [GETTING_STARTED.md](GETTING_STARTED.md) for how to run them. For broader research directions see [docs/research-examples.md](docs/research-examples.md).
 
 ## Documentation
 
 | Document | Purpose |
 |---|---|
-| [docs/getting-started.md](docs/getting-started.md) | First-time setup and LEAN CLI configuration |
+| [GETTING_STARTED.md](GETTING_STARTED.md) | First-time setup and running the example notebooks |
 | [docs/project-map.md](docs/project-map.md) | Repository layout and responsibilities |
 | [docs/research-examples.md](docs/research-examples.md) | Research project ideas |
 | [docs/architecture.md](docs/architecture.md) | Atomic architecture guide |
@@ -161,11 +128,11 @@ See [docs/research-examples.md](docs/research-examples.md) for detailed project 
 
 ## Requirements
 
-- Python 3.8 or later
+- Python 3.11+
 - Git
-- QuantConnect account
-- LEAN CLI
-- Docker Desktop for local backtests
+- For the example notebooks: `pip install -r infrastructure/marimo/requirements.txt`
+- For QuantConnect/LEAN work: QuantConnect account, LEAN CLI, Docker Desktop
+- Optional: WRDS institutional access (one notebook section; skipped automatically if unavailable)
 
 ## Open Source License
 
