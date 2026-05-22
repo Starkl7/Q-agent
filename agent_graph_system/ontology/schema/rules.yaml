@@ -1,0 +1,37 @@
+rules:
+  staleness:
+    description: "A Strategy is stale if any of its DEPENDS_ON datasets are stale"
+    trigger: "Dataset.status = stale"
+    propagate_to: "Strategy via DEPENDS_ON"
+    action: "set Strategy.status = stale, notify MonitoringAgent"
+
+  backtest_lineage:
+    description: "Every Backtest must trace back to at least one Dataset"
+    constraint: "Backtest -[GENERATES]- Notebook -[USES]- Dataset"
+    severity: warning
+
+  deployment_gate:
+    description: "A Strategy can only DEPLOY_TO live if last Backtest.sharpe >= 0.5"
+    condition: "Backtest.sharpe >= 0.5"
+    severity: blocking
+
+  circular_dependency:
+    description: "DEPENDS_ON relationships must be acyclic"
+    constraint: "no cycles in DEPENDS_ON graph"
+    severity: error
+
+  temporal_validity:
+    description: "Relationships with valid_from/valid_to must be filtered at query time"
+    applies_to: [HOLDS, BELONGS_TO, FEEDS, DEPENDS_ON]
+    enforce_at: query
+
+  agent_ownership:
+    description: "Each Pipeline must be MONITORS-ed by at least one Agent"
+    constraint: "Pipeline <- [MONITORS] - Agent"
+    severity: warning
+
+  data_freshness_sla:
+    description: "Datasets from WRDS/Bloomberg older than 1 day are stale"
+    condition: "Dataset.last_updated < now() - 1 day"
+    applies_to: [WRDS, Bloomberg]
+    action: "set Dataset.status = stale"

@@ -1,0 +1,3 @@
+wrds
+pandas
+python-dotenv

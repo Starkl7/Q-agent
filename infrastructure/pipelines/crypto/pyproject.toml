@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "crypto-lean"
+version = "0.1.0"
+description = "Unified ccxt-based crypto OHLCV pipeline that writes LEAN-format zips."
+requires-python = ">=3.11"
+dependencies = [
+    "ccxt>=4.4.0",
+    "pandas>=2.2.0",
+    "python-dotenv>=1.0.0",
+    "tenacity>=8.5.0",
+    "tqdm>=4.66.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]

@@ -1,0 +1,81 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# Virtual Environment
+venv/
+.venv/
+env/
+ENV/
+
+# Lean Engine (don't commit the full Lean repo)
+Lean/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# QuantConnect
+# Ignore all project directories (they have their own repos)
+MyProjects/*/
+
+# But keep shared resources
+!MyProjects/_template/
+!MyProjects/.claude/
+
+# Exclude data/storage entirely — populate locally via `lean init` after cloning.
+# QC sample data (AlgoSeek-sourced) is not redistributed in this repo.
+MyProjects/data/
+MyProjects/storage/
+
+# Exclude large data/cache within shared dirs
+*.zip
+*.cache
+**/backtests/**/*.json
+**/backtests/**/*.txt
+**/backtests/**/*.html
+**/backtests/**/config
+
+# Marimo session cache (generated when notebooks run)
+**/__marimo__/
+
+# Credentials and secrets
+.env
+.env.local
+**/.env
+!**/.env.example
+lean.json
+**/config.json
+*.key
+*.pem
+credentials.json
+
+# Large PDFs (optional - remove if you want to track them)
+*.pdf
+
+# References — exclude large cloned repos
+References/repos/
+
+# Temporary files
+*.tmp
+*.temp
+
+# Root .claude/ - keep skills, ignore local settings
+/.claude/settings.local.json
+/.claude/logs/
+/.claude/memory/pending.md

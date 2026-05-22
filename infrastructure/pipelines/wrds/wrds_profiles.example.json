@@ -1,0 +1,17 @@
+{
+  "default_profile": "upenn",
+  "profiles": {
+    "upenn": {
+      "username": "your_existing_wrds_username",
+      "hostname": "wrds-pgdata.wharton.upenn.edu",
+      "port": 9737,
+      "dbname": "wrds"
+    },
+    "new_university": {
+      "username": "your_new_wrds_username",
+      "hostname": "wrds-pgdata.wharton.upenn.edu",
+      "port": 9737,
+      "dbname": "wrds"
+    }
+  }
+}

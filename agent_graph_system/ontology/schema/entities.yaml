@@ -1,0 +1,104 @@
+entities:
+  Agent:
+    description: "An AI agent in the system"
+    properties:
+      - name: string
+      - role: string
+      - status: enum[active, idle, error]
+      - last_seen: datetime
+
+  Dataset:
+    description: "A data source or derived dataset"
+    properties:
+      - name: string
+      - source: enum[WRDS, EDGAR, Bloomberg, Polymarket, Crypto, SQL, QuantConnect, GitHub]
+      - status: enum[fresh, stale, unavailable]
+      - last_updated: datetime
+      - schema_version: string
+
+  Notebook:
+    description: "A research or analysis notebook"
+    properties:
+      - name: string
+      - path: string
+      - notebook_type: enum[research, backtest, analysis, ingestion]
+      - last_run: datetime
+      - status: enum[passing, failing, untested]
+
+  Strategy:
+    description: "A trading strategy"
+    properties:
+      - name: string
+      - strategy_type: enum[momentum, mean_reversion, options, factor, ml]
+      - status: enum[live, paper, backtesting, archived]
+      - universe: string
+
+  Backtest:
+    description: "A completed backtest run"
+    properties:
+      - name: string
+      - run_id: string
+      - sharpe: float
+      - max_drawdown: float
+      - cagr: float
+      - run_date: datetime
+      - status: enum[completed, failed, running]
+
+  Repository:
+    description: "A git repository"
+    properties:
+      - name: string
+      - url: string
+      - branch: string
+      - last_commit: string
+      - last_updated: datetime
+
+  Pipeline:
+    description: "A data ingestion or processing pipeline"
+    properties:
+      - name: string
+      - pipeline_type: enum[ingestion, transform, backtest, deploy]
+      - schedule: string
+      - status: enum[running, idle, failed]
+      - last_run: datetime
+
+  API:
+    description: "An external API endpoint or service"
+    properties:
+      - name: string
+      - url: string
+      - api_type: enum[REST, GraphQL, WebSocket, FTP]
+      - auth_type: enum[apikey, oauth, none]
+
+  FactorModel:
+    description: "A quantitative factor model"
+    properties:
+      - name: string
+      - factors: list[string]
+      - frequency: enum[daily, weekly, monthly]
+
+  Filing:
+    description: "An SEC filing"
+    properties:
+      - ticker: string
+      - form_type: enum[10-K, 10-Q, 8-K]
+      - period: string
+      - filed_date: datetime
+      - accession_number: string
+
+  Security:
+    description: "A financial security"
+    properties:
+      - ticker: string
+      - name: string
+      - asset_type: enum[equity, etf, option, future, crypto]
+      - sector: string
+      - exchange: string
+
+  Workflow:
+    description: "An orchestrated multi-step workflow"
+    properties:
+      - name: string
+      - steps: list[string]
+      - status: enum[active, paused, completed, failed]
+      - trigger: enum[schedule, event, manual]

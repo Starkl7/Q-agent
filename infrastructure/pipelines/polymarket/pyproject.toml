@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "polymarket-lean"
+version = "0.1.0"
+description = "Polymarket Gamma + CLOB pipeline to LEAN alternative-data CSVs."
+requires-python = ">=3.11"
+dependencies = [
+    "requests>=2.32.0",
+    "pandas>=2.2.0",
+    "python-dotenv>=1.0.0",
+    "tenacity>=8.5.0",
+    "tqdm>=4.66.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]

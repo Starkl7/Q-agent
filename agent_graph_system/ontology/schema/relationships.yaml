@@ -1,0 +1,111 @@
+relationships:
+  USES:
+    description: "Entity uses a dataset or resource"
+    from: [Notebook, Strategy, FactorModel, Pipeline, Agent]
+    to: [Dataset, API, FactorModel]
+    properties:
+      - since: datetime
+      - access_type: enum[read, write, readwrite]
+
+  GENERATES:
+    description: "Entity produces an output"
+    from: [Notebook, Strategy, Pipeline, Agent]
+    to: [Backtest, Dataset, Filing]
+    properties:
+      - generated_at: datetime
+
+  DEPENDS_ON:
+    description: "Hard dependency — downstream breaks if upstream is stale"
+    from: [Notebook, Strategy, Pipeline, FactorModel, Backtest]
+    to: [Dataset, Pipeline, API, Repository]
+    properties:
+      - criticality: enum[blocking, soft]
+      - valid_from: datetime
+      - valid_to: datetime
+
+  DEPLOYS_TO:
+    description: "Strategy or backtest deployed to a broker or environment"
+    from: [Strategy, Backtest]
+    to: [API]
+    properties:
+      - deployed_at: datetime
+      - environment: enum[live, paper, staging]
+
+  QUERIES:
+    description: "Agent or notebook queries a data source"
+    from: [Agent, Notebook]
+    to: [Dataset, API]
+    properties:
+      - last_queried: datetime
+      - query_frequency: string
+
+  PRODUCES:
+    description: "Pipeline or notebook produces a dataset"
+    from: [Pipeline, Notebook, Agent]
+    to: [Dataset, Backtest]
+    properties:
+      - produced_at: datetime
+      - version: string
+
+  CONTAINS:
+    description: "Repository or workflow contains sub-entities"
+    from: [Repository, Workflow]
+    to: [Notebook, Pipeline, Strategy]
+
+  MONITORS:
+    description: "Agent monitors a resource for changes"
+    from: [Agent]
+    to: [Pipeline, Dataset, Repository, Strategy]
+    properties:
+      - check_interval: string
+      - alert_on: list[string]
+
+  ORCHESTRATES:
+    description: "Agent coordinates another agent or workflow"
+    from: [Agent, Workflow]
+    to: [Agent, Pipeline]
+
+  FEEDS:
+    description: "Dataset feeds into a factor model or strategy"
+    from: [Dataset]
+    to: [FactorModel, Strategy, Pipeline]
+    properties:
+      - valid_from: datetime
+      - valid_to: datetime
+
+  USED_BY:
+    description: "Dataset or model used by a strategy"
+    from: [Dataset, FactorModel]
+    to: [Strategy, Backtest]
+
+  BELONGS_TO:
+    description: "Security belongs to a sector or index"
+    from: [Security]
+    to: [Security]
+    properties:
+      - relationship_type: enum[sector, index, etf_constituent]
+      - valid_from: datetime
+      - valid_to: datetime
+
+  HOLDS:
+    description: "Strategy or fund holds a security position"
+    from: [Strategy]
+    to: [Security]
+    properties:
+      - weight: float
+      - valid_from: datetime
+      - valid_to: datetime
+
+  FILED:
+    description: "Company filed an SEC document"
+    from: [Security]
+    to: [Filing]
+    properties:
+      - filed_at: datetime
+
+  TRIGGERED_BY:
+    description: "Event or workflow triggered by another entity"
+    from: [Workflow, Pipeline, Agent]
+    to: [Repository, Dataset, API]
+    properties:
+      - trigger_type: enum[webhook, schedule, manual, event]
