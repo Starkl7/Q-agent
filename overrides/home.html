@@ -1,0 +1,105 @@
+{% extends "main.html" %}
+
+{% block tabs %}
+{{ super() }}
+
+<section class="mdx-hero">
+  <div class="mdx-hero__inner md-grid">
+    <div class="mdx-hero__content">
+      <h1>Q-agent</h1>
+      <p>An open-source workspace for quantitative finance research,
+        QuantConnect strategy development, and reproducible trading analysis.</p>
+      <div class="mdx-hero__ctas">
+        <a href="getting-started/" class="md-button md-button--primary">Get Started →</a>
+        <a href="https://github.com/WolfpackOfOne/Q-agent" class="md-button">View on GitHub</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="mdx-features">
+  <div class="mdx-features__inner md-grid">
+    <div class="mdx-feature">
+      <div class="mdx-feature__icon">📈</div>
+      <div class="mdx-feature__body">
+        <h3>QuantConnect &amp; LEAN</h3>
+        <p>Cloud and local backtesting with the LEAN engine. Atomic project structure,
+          shared signals library, and tested workflow patterns for strategy development.</p>
+      </div>
+    </div>
+
+    <div class="mdx-feature">
+      <div class="mdx-feature__icon">🗄️</div>
+      <div class="mdx-feature__body">
+        <h3>Data Pipelines</h3>
+        <p>Ready-made pipelines for crypto (Coinbase&thinsp;/&thinsp;Kraken), Polymarket prediction
+          markets, WRDS&thinsp;/&thinsp;CRSP, SEC EDGAR, and yfinance price data.</p>
+      </div>
+    </div>
+
+    <div class="mdx-feature">
+      <div class="mdx-feature__icon">📓</div>
+      <div class="mdx-feature__body">
+        <h3>Research Notebooks</h3>
+        <p>Interactive Marimo notebooks for signal research, factor analysis, and backtest
+          diagnostics — runnable against real datasets with no cloud dependency.</p>
+      </div>
+    </div>
+
+    <div class="mdx-feature">
+      <div class="mdx-feature__icon">🤖</div>
+      <div class="mdx-feature__body">
+        <h3>AI-Assisted Workflows</h3>
+        <p>Claude Code integration with agent guidelines, tested prompt patterns, and
+          memory-backed workflows for safe, consistent AI-assisted development.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="mdx-quickstart">
+  <div class="mdx-quickstart__inner md-grid">
+    <div class="mdx-quickstart__text">
+      <h2>Zero to notebook in 3 commands</h2>
+      <p>Clone the repo, install notebook dependencies, and run the included
+        Election &amp; Industry Returns example — no QuantConnect account required.</p>
+      <a href="notebooks/" class="md-button md-button--primary">Full Setup Guide →</a>
+    </div>
+    <div class="mdx-quickstart__code">
+      <div class="mdx-code-block">
+        <div class="mdx-code-block__title">Terminal</div>
+        <pre><code>git clone https://github.com/WolfpackOfOne/Q-agent.git
+cd Q-agent
+python -m venv infrastructure/marimo/venv
+source infrastructure/marimo/venv/bin/activate
+pip install -r infrastructure/marimo/requirements.txt
+marimo run infrastructure/marimo/notebooks/election_industry_returns.py --port 2719</code></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="mdx-audience">
+  <div class="mdx-audience__inner md-grid">
+    <h2>Who this is for</h2>
+    <div class="mdx-audience__grid">
+      <div class="mdx-audience__item">
+        <strong>Masters students</strong> learning quantitative finance and systematic trading
+      </div>
+      <div class="mdx-audience__item">
+        <strong>Researchers</strong> prototyping trading strategies and signal ideas
+      </div>
+      <div class="mdx-audience__item">
+        <strong>Instructors</strong> teaching applied financial technology
+      </div>
+      <div class="mdx-audience__item">
+        <strong>Developers</strong> learning QuantConnect and LEAN CLI workflows
+      </div>
+    </div>
+  </div>
+</section>
+
+{% endblock %}
+
+{% block content %}{% endblock %}
+{% block footer %}{{ super() }}{% endblock %}

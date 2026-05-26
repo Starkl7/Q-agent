@@ -46,6 +46,11 @@ lean login
 lean --version
 ```
 
+<p class="mdx-recording-label">▶ LEAN cloud backtest workflow</p>
+<div class="mdx-recording">
+<asciinema-player src="../recordings/lean-backtest.cast" cols="120" rows="20" preload="true" idle-time-limit="2" theme="monokai"></asciinema-player>
+</div>
+
 ## Recommended Workflow
 
 - Keep strategy logic modular
