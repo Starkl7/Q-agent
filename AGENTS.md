@@ -483,6 +483,8 @@ See `MyProjects/shared/README.md` for the full convention and the bundled-data p
 - Do not create symlinks that point outside `MyProjects/shared/` (keeps paths predictable)
 - Always use **relative** symlink targets, never absolute
 
+**Local backtests require an extra Docker mount.** `lean backtest` mounts only the project dir into Docker, so a symlink whose target lives outside the project (e.g. `../../../shared/...`) dangles inside the container. The wrapper `scripts/lean-backtest.sh` adds the necessary `--extra-docker-config` volume mount; use it instead of `lean backtest` directly. Cloud backtests are unaffected — `lean cloud push` resolves symlinks at upload time and inlines the file content.
+
 ### Bundled Per-Project Data
 
 Some projects need to ship a small CSV alongside the algorithm (e.g. an alt-data snapshot, a static config). The convention:
@@ -498,6 +500,16 @@ Some projects need to ship a small CSV alongside the algorithm (e.g. an alt-data
 Important: `MyProjects/data/` (workspace level) is gitignored, but `MyProjects/<Project>/data/*.csv` IS committable — the per-project `data/` is treated as bundled algorithm input, not regenerable local cache. The project's own `.gitignore` should *not* exclude `data/`.
 
 The algorithm reads the CSV from disk in `Initialize` — no runtime HTTP calls. Refresh by running `python tools/refresh_<name>.py` manually, then re-pushing. Worked example: `MyProjects/ElectionIndustryBeta/{data/trump_prob.csv, tools/refresh_trump_prob.py}`.
+
+**Path resolution:** use a `__file__`-relative path, not a plain relative path. LEAN's cwd at runtime differs between local Docker and cloud, so `pd.read_csv("data/foo.csv")` is not reliable. Use:
+```python
+import os
+here = os.path.dirname(os.path.abspath(__file__))
+pd.read_csv(os.path.join(here, "data", "foo.csv"), parse_dates=["date"])
+```
+For belt-and-suspenders, fall back to `self.ObjectStore.Read("data/foo.csv")` (pre-populate via `lean cloud object-store set ...`).
+
+**Index alignment with LEAN bars:** `self.History(...)` returns timezone-aware bar-end timestamps (`2024-10-15 16:00:00-04:00`); a parsed CSV produces tz-naive midnight Timestamps. Inner-joining the two silently yields zero overlap. Normalise the History index at the LEAN boundary to tz-naive midnight before joining — keeps pure-Python signal atoms format-agnostic. Worked example: `MyProjects/ElectionIndustryBeta/main.py::_recent_returns`.
 
 ### Documentation Checklist
 

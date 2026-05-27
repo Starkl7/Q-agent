@@ -15,6 +15,68 @@ Rules:
 
 First use: `MyProjects/ElectionIndustryBeta/domain/signals/election_beta.py → ../../../shared/signals/election_beta.py`.
 
+## `lean backtest` (local) — symlinks outside the project dangle inside Docker
+
+Symptom: `Loader.TryCreatePythonAlgorithm(): ... No module named 'domain.signals.<name>'` even though the import works under a plain venv.
+
+Cause: `lean backtest` mounts only the project directory into the container. A symlink at `<Project>/domain/signals/foo.py → ../../../shared/signals/foo.py` resolves to `/shared/signals/foo.py` inside the container — but `/shared/` isn't mounted, so the link dangles. Cloud backtests are unaffected because `lean cloud push` resolves the symlink at upload time.
+
+Fix: use the wrapper that adds the right `--extra-docker-config` mount:
+```bash
+bash ~/Documents/Q-agent/scripts/lean-backtest.sh "<ProjectName>"
+```
+which appends `{"volumes": {"<ws>/MyProjects/shared": {"bind": "/shared", "mode": "ro"}}}`.
+
+## Bundled per-project CSV — use `__file__`-relative path, not cwd
+
+Symptom: `pd.read_csv("data/foo.csv")` works locally but reads as empty (or `FileNotFoundError`) in cloud; algorithm silently produces 0 trades because downstream signal sees an empty DataFrame.
+
+Cause: LEAN's working directory at runtime differs between local Docker (`/LeanCLI`) and cloud (varies). A plain relative path is not portable.
+
+Fix:
+```python
+import os
+here = os.path.dirname(os.path.abspath(__file__))
+df = pd.read_csv(os.path.join(here, "data", "foo.csv"), parse_dates=["date"])
+```
+Belt-and-suspenders: fall back to `self.ObjectStore.Read("data/foo.csv")` and populate via `lean cloud object-store set "data/foo.csv" <path>` once per refresh.
+
+## LEAN `History` index is tz-aware bar-end — inner joins against CSV silently produce 0 rows
+
+Symptom: algorithm runs, History returns full bars, bundled CSV loads, but `rolling_beta(returns, delta_prob, ...)` returns all NaN. Logs show `returns=(64, 19), trump_prob_len=307, betas valid=0/19`.
+
+Cause: `self.History(...)` index is timezone-aware and time-stamped at the bar end (`2024-10-15 16:00:00-04:00` for daily US equity). A CSV parsed via `parse_dates=["date"]` from `YYYY-MM-DD` strings produces tz-naive midnight Timestamps. `returns.join(delta_prob, how="inner")` matches on the full Timestamp, so the overlap is empty.
+
+Fix at the LEAN-API boundary (keeps pure-Python signal atoms format-agnostic):
+```python
+idx = pd.to_datetime(closes.index)
+try:
+    idx = idx.tz_localize(None)
+except (TypeError, AttributeError):
+    pass
+closes.index = idx.normalize()
+```
+
+## `lean cloud push` rejects commas and unicode dashes in `description`
+
+Symptom: `Cannot push '<Project>': Invalid character ',' found in input string at position N` (or position pointing at `—`).
+
+Cause: the cloud API rejects `,`, `—`, and likely other non-ASCII / control chars in the `description` field of `config.json`.
+
+Fix: keep descriptions ASCII and comma-free.
+
+## `lean init` is interactive — pipe inputs for non-tty automation
+
+Symptom: `lean init` aborts with `Aborted!` when run non-interactively in a script.
+
+Cause: it prompts for (1) which QC organization to associate, and (2) confirmation that the cwd is non-empty.
+
+Fix when scripting:
+```bash
+printf "2\ny\n" | lean init    # 2 = pick the second org listed; y = proceed in non-empty dir
+```
+Org numbers come from the on-screen list and depend on the QC account. Better: do it interactively the first time and never script it.
+
 ## Polymarket Pipeline — Resolved Markets Need fidelity=1440
 
 Symptom: `run_prices_pipeline.py` writes empty CSV files for closed/resolved markets.

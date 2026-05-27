@@ -135,6 +135,14 @@ The target path is **three `..` deep** because symlink targets resolve relative 
 - All projects that need a signal get their own symlink; no project gets signals it doesn't use.
 - Verify the link after creation: `ls -la domain/signals/<name>.py` should show `-> ../../../shared/signals/<name>.py`.
 
+**Local backtests need an extra Docker mount.** `lean backtest` mounts only the project directory into the container, so the symlink target (which lives outside the project) dangles. Use the wrapper:
+
+```bash
+bash scripts/lean-backtest.sh "<ProjectName>"
+```
+
+which appends `--extra-docker-config '{"volumes": {"<workspace>/MyProjects/shared": {"bind": "/shared", "mode": "ro"}}}'` so the relative `../../../shared/...` resolves correctly inside the container. Cloud backtests (`lean cloud push` + `lean cloud backtest`) are unaffected — `lean cloud push` resolves the symlink at upload time.
+
 ## Bundled per-project data
 
 Per-project data (small CSVs that ship with the algorithm) lives at `<Project>/data/*.csv` and **is committable** — distinct from the workspace-level `MyProjects/data/` which is gitignored. The pattern is:
@@ -148,6 +156,30 @@ Per-project data (small CSVs that ship with the algorithm) lives at `<Project>/d
 ```
 
 The algorithm reads `<Project>/data/*.csv` from disk in `Initialize` — no runtime HTTP calls. The fetcher in `tools/` is run manually whenever you want a fresher snapshot. Worked example: `ElectionIndustryBeta/{data/trump_prob.csv, tools/refresh_trump_prob.py}`.
+
+**Resolve the path relative to `__file__`, not cwd.** LEAN's runtime working directory differs between local Docker (cwd = `/LeanCLI`) and cloud (cwd varies), so a plain relative path like `pd.read_csv("data/trump_prob.csv")` is not reliable. Use:
+
+```python
+import os
+here = os.path.dirname(os.path.abspath(__file__))
+df = pd.read_csv(os.path.join(here, "data", "trump_prob.csv"), parse_dates=["date"])
+```
+
+For robustness across environments, also fall back to `self.ObjectStore.Read(...)` if the disk read fails; pre-populate via `lean cloud object-store set "<key>" <local-path>`.
+
+**Index alignment when joining bundled data against LEAN bars.** `self.History(...)` returns a multi-index with timezone-aware bar-end timestamps (e.g. `2024-10-15 16:00:00-04:00` for daily US equity). A CSV parsed with `parse_dates=["date"]` from `YYYY-MM-DD` strings produces tz-naive midnight Timestamps. Joining the two with `pd.DataFrame.join(..., how="inner")` silently produces **zero overlapping rows**. Normalise the History index at the boundary:
+
+```python
+closes = bars["close"].unstack(level=0)
+idx = pd.to_datetime(closes.index)
+try:
+    idx = idx.tz_localize(None)  # strip tz if present
+except (TypeError, AttributeError):
+    pass
+closes.index = idx.normalize()    # collapse to midnight
+```
+
+Then join freely against any calendar-date-indexed CSV. Pure-Python signal atoms in `shared/signals/` stay format-agnostic and don't need to know about timezones.
 
 ## Coding conventions
 

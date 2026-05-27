@@ -50,6 +50,27 @@ lean cloud pull --project "<ProjectName>"
 lean cloud status --project "<ProjectName>"
 ```
 
+**First push creates the cloud project** — `lean cloud push --project <Name>` will auto-create the cloud-side project (and write `cloud-id` + `organization-id` back into the project's `config.json`) if no `config.json` exists yet. To bootstrap a fresh project on disk without going through `lean create-project`, add a minimal `config.json`:
+```json
+{
+    "algorithm-language": "Python",
+    "parameters": {},
+    "description": "ASCII-only description without commas or em-dashes"
+}
+```
+
+**Description-string gotcha:** the cloud API rejects `,` and unicode dashes like `—` in the `description` field with `Invalid character ',' found in input string at position N`. Keep descriptions ASCII and comma-free.
+
+### Local Backtest with Shared Signals
+
+`lean backtest` mounts only the project dir into Docker. Any symlink in `<Project>/domain/signals/` pointing to `../../../shared/signals/` dangles inside the container (`No module named 'domain.signals.<name>'`). Use the workspace wrapper:
+
+```bash
+bash ~/Documents/Q-agent/scripts/lean-backtest.sh "<ProjectName>"
+```
+
+It appends `--extra-docker-config` to mount `MyProjects/shared` at `/shared` inside the container. Cloud backtests are unaffected — `lean cloud push` resolves the symlink before upload.
+
 ### 2. Running Cloud Backtests
 
 ```bash
