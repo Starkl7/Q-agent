@@ -1,5 +1,5 @@
 site_name: Q-agent
-site_description: An agent-native quantitative research operating system — pipelines, notebooks, strategies, and AI workflows in one reproducible workspace.
+site_description: AI-compatible quantitative research workspace with pipelines, notebooks, LEAN strategies, and reproducible workflows.
 site_url: https://wolfpackofone.github.io/Q-agent/
 repo_url: https://github.com/WolfpackOfOne/Q-agent
 repo_name: WolfpackOfOne/Q-agent
@@ -40,10 +40,14 @@ nav:
   - Home: index.md
   - Start Here: start-here.md
   - Why Q-agent: why-q-agent.md
+
+  - Workflows:
+      - ElectionIndustryBeta: workflows/election-industry-beta.md
+
   - Getting Started:
       - LEAN & QuantConnect: getting-started.md
       - Running Notebooks: notebooks.md
-  - Architecture: architecture.md
+
   - Data Pipelines:
       - Overview: pipelines/index.md
       - Crypto: pipelines/crypto.md
@@ -51,11 +55,18 @@ nav:
       - WRDS / CRSP: pipelines/wrds.md
       - SEC EDGAR: pipelines/edgar.md
       - yfinance: pipelines/yfinance.md
+
   - Research:
       - Golden Path: golden-path.md
-      - Recipes: research-recipes.md
+      - Research Recipes: research-recipes.md
       - Examples: research-examples.md
+
   - Agent Workflows: agent-workflows.md
+
+  - Architecture: architecture.md
+
+  - Roadmap: roadmap.md
+
   - Contributing: contributing.md
 
 extra_css:
