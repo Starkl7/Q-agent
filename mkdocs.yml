@@ -1,5 +1,5 @@
 site_name: Q-agent
-site_description: Open-source workspace for quantitative finance research, QuantConnect strategy development, and reproducible trading analysis.
+site_description: An agent-native quantitative research operating system — pipelines, notebooks, strategies, and AI workflows in one reproducible workspace.
 site_url: https://wolfpackofone.github.io/Q-agent/
 repo_url: https://github.com/WolfpackOfOne/Q-agent
 repo_name: WolfpackOfOne/Q-agent
@@ -36,27 +36,37 @@ theme:
 
 nav:
   - Home: index.md
+  - Start Here: start-here.md
+  - Why Q-agent: why-q-agent.md
   - Getting Started:
       - LEAN & QuantConnect: getting-started.md
       - Running Notebooks: notebooks.md
   - Architecture: architecture.md
-  - Research: research-examples.md
-  - Project Map: project-map.md
+  - Data Pipelines:
+      - Overview: pipelines/index.md
+      - Crypto: pipelines/crypto.md
+      - Polymarket: pipelines/polymarket.md
+      - WRDS / CRSP: pipelines/wrds.md
+      - SEC EDGAR: pipelines/edgar.md
+      - yfinance: pipelines/yfinance.md
+  - Research:
+      - Recipes: research-recipes.md
+      - Examples: research-examples.md
   - Agent Workflows: agent-workflows.md
   - Contributing: contributing.md
 
 extra_css:
   - stylesheets/extra.css
-  - https://cdn.jsdelivr.net/npm/asciinema-player@3/dist/bundle/player.css
-
-extra_javascript:
-  - https://cdn.jsdelivr.net/npm/asciinema-player@3/dist/bundle/player.min.js
 
 markdown_extensions:
   - pymdownx.highlight:
       anchor_linenums: true
   - pymdownx.inlinehilite
-  - pymdownx.superfences
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
   - pymdownx.tabbed:
       alternate_style: true
   - admonition

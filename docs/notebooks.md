@@ -23,7 +23,7 @@ pip install -r infrastructure/marimo/requirements.txt
 
 ## Notebook 1: Election & Industry Returns
 
-Explores the relationship between Trump 2024 election probability (Polymarket) and US industry returns (Kenneth French data library).
+Explores the relationship between Trump 2024 election probability (Polymarket) and US sector/industry ETF returns (yfinance: XLE, XLF, XLV, XLI, XLK, XLP, XLY, XLU, XLB, XLRE, XLC, plus Trump-themed slices XOP, ITA, KBE, IBB, ICLN, TAN, GDX, ITB).
 
 **All data is fetched live from public APIs — no local data required.**
 
@@ -34,10 +34,7 @@ marimo run infrastructure/marimo/notebooks/election_industry_returns.py --port 2
 
 Open: <http://localhost:2719>
 
-<p class="mdx-recording-label">▶ Terminal walkthrough</p>
-<div class="mdx-recording">
-<asciinema-player src="../recordings/notebook-election.cast" cols="120" rows="20" preload="true" idle-time-limit="2" theme="monokai"></asciinema-player>
-</div>
+![Notebook setup walkthrough](recordings/notebook-election.gif)
 
 ---
 
