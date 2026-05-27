@@ -364,6 +364,39 @@ df = pd.read_csv(StringIO(data_str), parse_dates=['date'])
 - Do not assume that changes under `MyProjects/` belong to the workspace-level repository
 - Shared assets under `MyProjects/.claude/`, `MyProjects/data/`, and `MyProjects/storage/` may be governed by the workspace repository instead of a project repo
 
+### Workspace Remote — `main` Is Branch-Protected
+
+The workspace repo has TWO git remotes on disk and direct pushes to `main` are blocked by GitHub policy.
+
+| Remote | URL | Use |
+|---|---|---|
+| `q-agent` | `WolfpackOfOne/Q-agent` | **Canonical workspace repo.** Local `main` tracks `q-agent/main`. This is the PR target. |
+| `origin` | `WolfpackOfOne/QuantConnect_Master` | A separate, divergent repo. Do **not** push to its `main`. |
+
+Direct `git push q-agent main` is rejected:
+```
+remote: error: GH013: Repository rule violations found for refs/heads/main.
+remote: - Changes must be made through a pull request.
+```
+
+The required workflow:
+```bash
+git checkout -b feature/<descriptive-name>
+# ... commits ...
+git push -u q-agent feature/<descriptive-name>
+gh pr create --repo WolfpackOfOne/Q-agent --base main --head feature/<descriptive-name> --title "..." --body "..."
+# Merge via the GitHub UI (or `gh pr merge --merge` once CI passes)
+```
+
+If a rebase puts work onto local `main` by accident, the recovery is:
+```bash
+git branch feature/<name> HEAD          # park the work on a feature branch
+git reset --hard q-agent/main           # main back to the protected HEAD
+git checkout feature/<name>
+git push -u q-agent feature/<name>
+```
+Never `git push --force` to `main` even with the `--force-with-lease` cushion — the branch protection rejects it regardless.
+
 ### Files to Commit
 
 - `main.py` and all algorithm modules
