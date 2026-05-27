@@ -156,25 +156,51 @@ class ElectionIndustryBeta(QCAlgorithm):
     # ------------------------------------------------------------------
 
     def _load_trump_prob(self) -> pd.Series:
-        """Read the bundled Polymarket snapshot from disk.
+        """Read the bundled Polymarket snapshot.
 
-        Tries the project working directory first (local backtest), then
-        ObjectStore (cloud, if uploaded). Falls back to an empty Series so
-        Initialize never raises — _rebalance will simply produce all-zero
-        betas if the data is missing.
+        Tries three sources in order, since LEAN's runtime working directory
+        differs between local Docker (cwd = /LeanCLI) and cloud (cwd varies):
+          1. Path resolved from __file__ — most reliable in both environments.
+          2. Plain relative path from config — works locally if cwd is project root.
+          3. Organisation cloud ObjectStore — populated via
+             `lean cloud object-store set "data/trump_prob.csv" <path>`.
+
+        Returns an empty Series if every source fails so Initialize never raises;
+        _rebalance then no-ops gracefully and the failure is visible in the log.
         """
+        import os
+
+        candidates = []
         try:
-            df = pd.read_csv(TRUMP_PROB_CSV, parse_dates=["date"], index_col="date")
-            return df["prob_trump"].astype(float).sort_index()
-        except FileNotFoundError:
-            self.Debug(f"{TRUMP_PROB_CSV} not on disk; trying ObjectStore")
+            here = os.path.dirname(os.path.abspath(__file__))
+            candidates.append(os.path.join(here, TRUMP_PROB_CSV))
+        except NameError:
+            pass  # __file__ undefined in some research notebook contexts
+        candidates.append(TRUMP_PROB_CSV)
+
+        for path in candidates:
+            try:
+                df = pd.read_csv(path, parse_dates=["date"], index_col="date")
+                s = df["prob_trump"].astype(float).sort_index()
+                self.Log(f"[_load_trump_prob] loaded {len(s)} rows from {path}")
+                return s
+            except FileNotFoundError:
+                continue
+            except Exception as e:
+                self.Log(f"[_load_trump_prob] error reading {path}: {type(e).__name__}: {e}")
+
         try:
             blob = self.ObjectStore.Read(TRUMP_PROB_CSV)
-            df = pd.read_csv(StringIO(blob), parse_dates=["date"], index_col="date")
-            return df["prob_trump"].astype(float).sort_index()
+            if blob:
+                df = pd.read_csv(StringIO(blob), parse_dates=["date"], index_col="date")
+                s = df["prob_trump"].astype(float).sort_index()
+                self.Log(f"[_load_trump_prob] loaded {len(s)} rows from ObjectStore")
+                return s
         except Exception as e:
-            self.Error(f"Trump-probability CSV unavailable: {e}")
-            return pd.Series(dtype=float)
+            self.Error(f"[_load_trump_prob] ObjectStore read failed: {type(e).__name__}: {e}")
+
+        self.Error("[_load_trump_prob] all sources failed — Trump probability unavailable")
+        return pd.Series(dtype=float)
 
     def _recent_returns(self) -> pd.DataFrame | None:
         """Daily simple returns (percent) for the universe over LOOKBACK+5 days."""
@@ -190,6 +216,16 @@ class ElectionIndustryBeta(QCAlgorithm):
         closes.columns = [str(c).split()[0] for c in closes.columns]  # strip exchange
         # Reindex to the ticker order in UNIVERSE; drop any tickers without data.
         closes = closes.reindex(columns=[t for t in UNIVERSE if t in closes.columns])
+        # LEAN's History index is timezone-aware and time-stamped at market open;
+        # trump_prob.csv is timezone-naive and midnight-aligned. Normalise both
+        # to date-only so the inner join in rolling_beta has any overlap to work
+        # with.
+        idx = pd.to_datetime(closes.index)
+        try:
+            idx = idx.tz_localize(None)
+        except (TypeError, AttributeError):
+            pass  # already naive
+        closes.index = idx.normalize()
         returns_pct = closes.pct_change().dropna(how="all") * 100.0
         return returns_pct
 

@@ -93,6 +93,23 @@ lean cloud push --project "ElectionIndustryBeta" --force
 lean cloud backtest "ElectionIndustryBeta" --name "v1 baseline 60d K=3"
 ```
 
+### Local backtest (Docker)
+
+```bash
+bash ~/Documents/Q-agent/scripts/lean-backtest.sh "ElectionIndustryBeta"
+```
+
+The wrapper appends an `--extra-docker-config` mount so the shared-signal symlink at `domain/signals/election_beta.py` resolves inside the container. Plain `lean backtest "ElectionIndustryBeta"` would fail with `No module named 'domain.signals.election_beta'`.
+
+Local backtest also requires the workspace's `data/equity/usa/daily/` to contain real zip files for the 19 ETFs + SPY (not symlinks). The yfinance pipeline produces them:
+```bash
+cd ~/Documents/Q-agent/infrastructure/pipelines/yfinance
+python scripts/run_pipeline.py --tickers XLE XLF XLV XLI XLK XLP XLY XLU XLB XLRE XLC XOP ITA KBE IBB ICLN TAN GDX ITB SPY --start 2023-12-01 --end 2024-11-15
+cp lean-data/equity/usa/daily/*.zip ~/Documents/Q-agent/MyProjects/data/equity/usa/daily/
+cp lean-data/equity/usa/factor_files/*.csv ~/Documents/Q-agent/MyProjects/data/equity/usa/factor_files/
+cp lean-data/equity/usa/map_files/*.csv ~/Documents/Q-agent/MyProjects/data/equity/usa/map_files/
+```
+
 ### Pull from cloud
 
 ```bash
