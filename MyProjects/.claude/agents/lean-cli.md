@@ -15,7 +15,21 @@ Before ANY lean command, you MUST activate the virtual environment:
 cd ~/Documents/Q-agent && source venv/bin/activate && cd MyProjects
 ```
 
-Verify with: `which lean` should output `~/Documents/Q-agent/venv/bin/lean`
+Verify with: `which lean` should output `~/Documents/Q-agent/venv/bin/lean`.
+
+**If the venv does not exist yet** (`source venv/bin/activate` fails or `which lean` is empty), create it once per machine — the venv is not checked in:
+
+```bash
+cd ~/Documents/Q-agent
+python3 -m venv venv
+source venv/bin/activate
+pip install --upgrade pip
+pip install lean
+```
+
+Then continue from "Verify with…". Full first-time setup including QC auth: `docs/getting-started.md`.
+
+Run `bash scripts/check-prereqs.sh` if you're unsure whether the workspace is ready.
 
 ## Directory Structure
 - **Working directory**: `~/Documents/Q-agent/MyProjects`
@@ -35,6 +49,27 @@ lean cloud pull --project "<ProjectName>"
 # Check cloud project status
 lean cloud status --project "<ProjectName>"
 ```
+
+**First push creates the cloud project** — `lean cloud push --project <Name>` will auto-create the cloud-side project (and write `cloud-id` + `organization-id` back into the project's `config.json`) if no `config.json` exists yet. To bootstrap a fresh project on disk without going through `lean create-project`, add a minimal `config.json`:
+```json
+{
+    "algorithm-language": "Python",
+    "parameters": {},
+    "description": "ASCII-only description without commas or em-dashes"
+}
+```
+
+**Description-string gotcha:** the cloud API rejects `,` and unicode dashes like `—` in the `description` field with `Invalid character ',' found in input string at position N`. Keep descriptions ASCII and comma-free.
+
+### Local Backtest with Shared Signals
+
+`lean backtest` mounts only the project dir into Docker. Any symlink in `<Project>/domain/signals/` pointing to `../../../shared/signals/` dangles inside the container (`No module named 'domain.signals.<name>'`). Use the workspace wrapper:
+
+```bash
+bash ~/Documents/Q-agent/scripts/lean-backtest.sh "<ProjectName>"
+```
+
+It appends `--extra-docker-config` to mount `MyProjects/shared` at `/shared` inside the container. Cloud backtests are unaffected — `lean cloud push` resolves the symlink before upload.
 
 ### 2. Running Cloud Backtests
 
@@ -88,8 +123,8 @@ lean cloud backtest "<ProjectName>" --name "Descriptive run name"
 
 | Issue | Solution |
 |-------|----------|
-| `lean: command not found` | Activate venv: `source venv/bin/activate` |
-| `lean.json not found` | Navigate to MyProjects: `cd MyProjects` |
+| `lean: command not found` | Activate venv: `source venv/bin/activate`. If still missing, the venv hasn't been built — see "Virtual Environment Requirement" above. |
+| `lean.json not found` | `cd MyProjects && lean init` (creates it; gitignored) |
 | Push fails | Check for Python syntax errors in code |
 | Auth errors | Run `lean login` to re-authenticate |
 

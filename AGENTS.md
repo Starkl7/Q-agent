@@ -364,6 +364,39 @@ df = pd.read_csv(StringIO(data_str), parse_dates=['date'])
 - Do not assume that changes under `MyProjects/` belong to the workspace-level repository
 - Shared assets under `MyProjects/.claude/`, `MyProjects/data/`, and `MyProjects/storage/` may be governed by the workspace repository instead of a project repo
 
+### Workspace Remote — `main` Is Branch-Protected
+
+The workspace repo has TWO git remotes on disk and direct pushes to `main` are blocked by GitHub policy.
+
+| Remote | URL | Use |
+|---|---|---|
+| `q-agent` | `WolfpackOfOne/Q-agent` | **Canonical workspace repo.** Local `main` tracks `q-agent/main`. This is the PR target. |
+| `origin` | `WolfpackOfOne/QuantConnect_Master` | A separate, divergent repo. Do **not** push to its `main`. |
+
+Direct `git push q-agent main` is rejected:
+```
+remote: error: GH013: Repository rule violations found for refs/heads/main.
+remote: - Changes must be made through a pull request.
+```
+
+The required workflow:
+```bash
+git checkout -b feature/<descriptive-name>
+# ... commits ...
+git push -u q-agent feature/<descriptive-name>
+gh pr create --repo WolfpackOfOne/Q-agent --base main --head feature/<descriptive-name> --title "..." --body "..."
+# Merge via the GitHub UI (or `gh pr merge --merge` once CI passes)
+```
+
+If a rebase puts work onto local `main` by accident, the recovery is:
+```bash
+git branch feature/<name> HEAD          # park the work on a feature branch
+git reset --hard q-agent/main           # main back to the protected HEAD
+git checkout feature/<name>
+git push -u q-agent feature/<name>
+```
+Never `git push --force` to `main` even with the `--force-with-lease` cushion — the branch protection rejects it regardless.
+
 ### Files to Commit
 
 - `main.py` and all algorithm modules
@@ -469,14 +502,47 @@ When setting up a new QuantConnect project with atomic structure:
 **One-time setup** (run from inside the project directory):
 ```bash
 mkdir -p domain/signals
-ln -s ../shared/signals/my_signal.py domain/signals/my_signal.py
+ln -s ../../../shared/signals/my_signal.py domain/signals/my_signal.py
 ```
+
+The target is **three `..` deep** — symlink targets resolve relative to the symlink's *location* (`<Project>/domain/signals/`), not the cwd. Two `..` produces a dangling link that fails at import time. Verify with `ls -la domain/signals/my_signal.py`.
+
+See `MyProjects/shared/README.md` for the full convention and the bundled-data pattern that often pairs with it.
 
 **Rules for agents:**
 - Signal files in `shared/signals/` must be pure Python — no `from AlgorithmImports import *`, no LEAN types
 - When a project needs a shared signal, create the symlink; do not copy the file
 - When editing a shared signal, edit `shared/signals/` — never the symlink copy inside a project
 - Do not create symlinks that point outside `MyProjects/shared/` (keeps paths predictable)
+- Always use **relative** symlink targets, never absolute
+
+**Local backtests require an extra Docker mount.** `lean backtest` mounts only the project dir into Docker, so a symlink whose target lives outside the project (e.g. `../../../shared/...`) dangles inside the container. The wrapper `scripts/lean-backtest.sh` adds the necessary `--extra-docker-config` volume mount; use it instead of `lean backtest` directly. Cloud backtests are unaffected — `lean cloud push` resolves symlinks at upload time and inlines the file content.
+
+### Bundled Per-Project Data
+
+Some projects need to ship a small CSV alongside the algorithm (e.g. an alt-data snapshot, a static config). The convention:
+
+```
+<Project>/
+├── data/                # tracked, committed
+│   └── <name>.csv       # bundled snapshot — uploaded by `lean cloud push`, read in Initialize
+└── tools/               # tracked
+    └── refresh_<name>.py  # one-off fetcher run manually; NOT imported by the algorithm
+```
+
+Important: `MyProjects/data/` (workspace level) is gitignored, but `MyProjects/<Project>/data/*.csv` IS committable — the per-project `data/` is treated as bundled algorithm input, not regenerable local cache. The project's own `.gitignore` should *not* exclude `data/`.
+
+The algorithm reads the CSV from disk in `Initialize` — no runtime HTTP calls. Refresh by running `python tools/refresh_<name>.py` manually, then re-pushing. Worked example: `MyProjects/ElectionIndustryBeta/{data/trump_prob.csv, tools/refresh_trump_prob.py}`.
+
+**Path resolution:** use a `__file__`-relative path, not a plain relative path. LEAN's cwd at runtime differs between local Docker and cloud, so `pd.read_csv("data/foo.csv")` is not reliable. Use:
+```python
+import os
+here = os.path.dirname(os.path.abspath(__file__))
+pd.read_csv(os.path.join(here, "data", "foo.csv"), parse_dates=["date"])
+```
+For belt-and-suspenders, fall back to `self.ObjectStore.Read("data/foo.csv")` (pre-populate via `lean cloud object-store set ...`).
+
+**Index alignment with LEAN bars:** `self.History(...)` returns timezone-aware bar-end timestamps (`2024-10-15 16:00:00-04:00`); a parsed CSV produces tz-naive midnight Timestamps. Inner-joining the two silently yields zero overlap. Normalise the History index at the LEAN boundary to tz-naive midnight before joining — keeps pure-Python signal atoms format-agnostic. Worked example: `MyProjects/ElectionIndustryBeta/main.py::_recent_returns`.
 
 ### Documentation Checklist
 

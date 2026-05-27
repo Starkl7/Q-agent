@@ -44,8 +44,6 @@ __pycache__/
 *.pem
 *.key
 
-# NOTE: per-project `data/*.csv` IS committable — it's the bundled-data
-# convention (see workspace AGENTS.md § "Bundled Per-Project Data").
-# The workspace-level .gitignore that excludes `MyProjects/data/` applies
-# to the SHARED dir at MyProjects/data/, not your project's own data/.
-# Do NOT add `data/` here.
+# NOTE: data/trump_prob.csv IS committed — it is a bundled snapshot that
+# travels with the algorithm. The workspace-level .gitignore that excludes
+# MyProjects/data/ applies to the shared dir, not per-project data/.
