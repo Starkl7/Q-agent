@@ -1,0 +1,56 @@
+# Dependabot configuration for Q-agent.
+#
+# This enables dependency update pull requests for:
+# - GitHub Actions workflows under .github/workflows/
+# - Python pip requirements at the repository root
+# - Python pip requirements under infrastructure/
+# - Python pip requirements under infrastructure/marimo/
+#
+# GitHub's dependency graph can read supported package manifests directly,
+# and Dependabot uses this file to open update PRs on a regular schedule.
+
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "deps"
+      include: "scope"
+
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "python"
+    commit-message:
+      prefix: "deps"
+      include: "scope"
+
+  - package-ecosystem: "pip"
+    directory: "/infrastructure"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "python"
+    commit-message:
+      prefix: "deps"
+      include: "scope"
+
+  - package-ecosystem: "pip"
+    directory: "/infrastructure/marimo"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "python"
+    commit-message:
+      prefix: "deps"
+      include: "scope"
