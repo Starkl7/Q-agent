@@ -3,8 +3,7 @@
 Q-agent ships a single workspace image bundling the LEAN CLI, the
 infrastructure pipelines (crypto / Polymarket / EDGAR / WRDS / yfinance), and
 marimo. The image is built and published to GitHub Container Registry by
-[`.github/workflows/docker.yml`](https://github.com/WolfpackOfOne/Q-agent/blob/main/.github/workflows/docker.yml)
-on every push to `main`.
+`.github/workflows/docker.yml` on every push to `main`.
 
 ## Quickstart
 
@@ -31,9 +30,8 @@ short-SHA tags (`sha-abc1234`) and version tags (`v1.2.3`) are also published.
   (`ccxt`, `pandas`, `numpy`, `yfinance`, `tenacity`, `tqdm`, `python-dotenv`,
   `requests`), marimo + its plotting stack (`matplotlib`, `plotly`, `seaborn`,
   `scipy`, `nbformat`), and dev tools (`pytest`, `pytest-cov`, `pytest-mock`)
-- The repository copied into `/workspace` (everything in
-  [`.dockerignore`](https://github.com/WolfpackOfOne/Q-agent/blob/main/.dockerignore)
-  is excluded — no credentials, no per-user data, no `.git/`)
+- The repository copied into `/workspace` (everything in `.dockerignore` is
+  excluded — no credentials, no per-user data, no `.git/`)
 - The `MyProjects/ElectionIndustryBeta/` demo project as a worked example
 - Runs as non-root user `qagent` (uid 1000)
 
@@ -131,9 +129,8 @@ docker run --rm q-agent:dev test -d /workspace/MyProjects/ElectionIndustryBeta
 
 Hygiene tests (`tests/hygiene/`) are skipped inside the container because
 they shell out to `git` against the working tree, and the image deliberately
-excludes `.git/`. They still run in
-[`.github/workflows/tests.yml`](https://github.com/WolfpackOfOne/Q-agent/blob/main/.github/workflows/tests.yml)
-where a fresh checkout is available.
+excludes `.git/`. They still run in `.github/workflows/tests.yml` where a
+fresh checkout is available.
 
 ## Image size
 
