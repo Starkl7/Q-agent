@@ -1,0 +1,93 @@
+# .dockerignore — keep the Q-agent image small, reproducible, and free of secrets.
+# Mirrors .gitignore for credential/data hygiene, plus extra build-time exclusions.
+
+# --- VCS & CI metadata (not needed at runtime) ---
+.git/
+.github/
+.gitignore
+.gitattributes
+
+# --- Python virtual envs (image builds its own at /opt/venv) ---
+venv/
+.venv/
+env/
+ENV/
+**/.venv/
+**/venv/
+
+# --- Build / cache artifacts ---
+**/__pycache__/
+**/*.py[cod]
+**/*.so
+**/*.egg-info/
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+build/
+dist/
+.Python
+
+# --- LEAN engine repo (reference only, multi-GB) ---
+Lean/
+
+# --- mkdocs build output ---
+site/
+
+# --- Documentation source (image doesn't serve docs) ---
+docs/
+
+# --- References library (large cloned repos) ---
+References/
+
+# --- Project per-user data, regenerated locally ---
+MyProjects/data/
+MyProjects/storage/
+**/lean-data/
+**/backtests/**/*.json
+**/backtests/**/*.txt
+**/backtests/**/*.html
+**/backtests/**/config
+**/__marimo__/
+
+# --- Other MyProjects (user-specific; only ElectionIndustryBeta ships as demo) ---
+# Exclude every per-project directory, then re-include the demo project.
+MyProjects/*/
+!MyProjects/_template/
+!MyProjects/.claude/
+!MyProjects/shared/
+!MyProjects/ElectionIndustryBeta/
+
+# --- Credentials & secrets (NEVER bake into image) ---
+.env
+.env.local
+**/.env
+!**/.env.example
+lean.json
+**/config.json
+*.key
+*.pem
+credentials.json
+
+# --- OS / editor cruft ---
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# --- Misc large/unneeded ---
+*.zip
+*.cache
+*.pdf
+*.tmp
+*.temp
+*.log
+
+# --- Claude harness state (host-specific) ---
+.claude/settings.local.json
+.claude/logs/
+.claude/memory/pending.md

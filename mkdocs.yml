@@ -47,6 +47,7 @@ nav:
   - Getting Started:
       - LEAN & QuantConnect: getting-started.md
       - Running Notebooks: notebooks.md
+      - Docker: docker.md
 
   - Data Pipelines:
       - Overview: pipelines/index.md
