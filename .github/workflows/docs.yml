@@ -38,7 +38,6 @@ jobs:
         with:
           args: >-
             --no-progress
-            --exclude-mail
             --accept 200,206,429
             --max-retries 3
             './docs/**/*.md'
