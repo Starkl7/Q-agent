@@ -136,6 +136,43 @@ MyFirstStrategy/
         └── mean_reversion.py → ../../shared/signals/mean_reversion.py
 ```
 
+Create a link from inside the project's `domain/signals/` directory:
+
+```bash
+cd MyProjects/MyFirstStrategy/domain/signals
+ln -s ../../../shared/signals/momentum.py momentum.py
+```
+
+### Windows / no-symlink fallback
+
+Symlinks are not guaranteed everywhere: on Windows they need Developer Mode or
+admin rights, and a repo unzipped from a GitHub ZIP (rather than cloned) can
+materialise links as plain text files. Two reliable options:
+
+- **Git symlinks on Windows** — clone with symlink support and the links in
+  this repo resolve normally:
+
+  ```powershell
+  git config --global core.symlinks true
+  git clone https://github.com/WolfpackOfOne/Q-agent.git
+  ```
+
+- **Copy instead of link** — if symlinks are unavailable, copy the signal in
+  and keep it in sync manually. The trade-off is you must re-copy when the
+  shared atom changes:
+
+  ```powershell
+  copy ..\..\..\shared\signals\momentum.py momentum.py   # Windows
+  ```
+  ```bash
+  cp ../../../shared/signals/momentum.py momentum.py       # macOS / Linux
+  ```
+
+`lean cloud push` follows symlinks, so the linked form is preferred when it
+works; the copy fallback only exists so onboarding never hard-blocks on
+symlink support. To check whether a link resolved correctly, confirm the file
+has real Python content (`cat` it) rather than a one-line path string.
+
 ---
 
 ## Goals
