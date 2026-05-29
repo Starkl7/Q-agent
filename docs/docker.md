@@ -18,7 +18,9 @@ docker run --rm -it ghcr.io/wolfpackofone/q-agent:latest lean --help
 docker run --rm -it ghcr.io/wolfpackofone/q-agent:latest marimo --help
 ```
 
-The image is built for `linux/amd64`. The `latest` tag tracks `main`;
+The image is published as a multi-arch manifest for `linux/amd64` and
+`linux/arm64`, so `docker pull` works natively on both x86 servers and Apple
+Silicon Macs (no `--platform` flag needed). The `latest` tag tracks `main`;
 short-SHA tags (`sha-abc1234`) and version tags (`v1.2.3`) are also published.
 
 ## What's inside
