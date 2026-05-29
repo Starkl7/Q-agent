@@ -58,6 +58,8 @@ def build_context_pack(
     docs: list[str] = []
     config_params: list[dict[str, Any]] = []
     notebooks: list[str] = []
+    file_ids: list[str] = []
+    notebook_ids: list[str] = []
 
     # Track the project's connected subgraph so low-confidence facts can be
     # gathered from exactly the nodes/edges that belong to this project —
@@ -73,15 +75,20 @@ def build_context_pack(
             edge_facts.append((f"{src_id} -[{rel_type}]-> {target_id}", edge))
         return rels
 
+    def _disp(node: dict[str, Any], fallback: str) -> str:
+        return node.get("rel_path") or node.get("path") or fallback
+
     for rel_type, target_id, _edge in _visit(project_id):
         node = engine.get_node(target_id) or {}
         label = node.get("_label")
         if label == "File":
-            (docs if rel_type == "HAS_DOC" else files).append(node.get("path", target_id))
+            (docs if rel_type == "HAS_DOC" else files).append(_disp(node, target_id))
+            file_ids.append(target_id)
         elif label == "ConfigParam":
             config_params.append({"param": node.get("param"), "value": node.get("value")})
         elif label == "ResearchNotebook":
-            notebooks.append(node.get("path", target_id))
+            notebooks.append(_disp(node, target_id))
+            notebook_ids.append(target_id)
 
     # Datasets / ObjectStore keys via the Strategy node's edges.
     datasets: list[dict[str, Any]] = []
@@ -98,22 +105,31 @@ def build_context_pack(
             })
 
     # Notebook ObjectStore reads (Notebook READS ObjectStoreKey).
-    for nb in list(notebooks):
-        for rel_type, target_id, _edge in _visit(f"ResearchNotebook::{nb}"):
+    for nb_id in notebook_ids:
+        nb_disp = _disp(engine.get_node(nb_id) or {}, nb_id)
+        for rel_type, target_id, _edge in _visit(nb_id):
             node = engine.get_node(target_id) or {}
             if node.get("_label") == "ObjectStoreKey" and rel_type in ("READS", "WRITES"):
                 objectstore.append({
                     "key": node.get("key"), "op": rel_type.lower(),
-                    "resolved": bool(node.get("resolved", True)), "via": f"notebook:{nb}",
+                    "resolved": bool(node.get("resolved", True)), "via": f"notebook:{nb_disp}",
                 })
 
-    signals = sorted(
-        n.get("name") for nid, n in engine.nodes("Signal") if n.get("project") == project
-    )
-    modules = sorted(
-        n.get("class_name", n.get("name")) for nid, n in engine.nodes("Module")
-        if n.get("project") == project
-    )
+    # Signals / modules via DEFINES edges from this project's files — robust to
+    # shared Signal nodes whose `project` property may belong to another project.
+    signal_names: set[str] = set()
+    module_names: set[str] = set()
+    for fid in file_ids:
+        for rel_type, target_id, _edge in _visit(fid):
+            if rel_type != "DEFINES":
+                continue
+            node = engine.get_node(target_id) or {}
+            if node.get("_label") == "Signal":
+                signal_names.add(node.get("name"))
+            elif node.get("_label") == "Module":
+                module_names.add(node.get("class_name") or node.get("name"))
+    signals = sorted(n for n in signal_names if n)
+    modules = sorted(n for n in module_names if n)
 
     backtest = engine.latest_backtest_for_strategy(project)
 

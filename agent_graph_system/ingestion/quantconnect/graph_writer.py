@@ -48,22 +48,31 @@ def ingest_project(project_root: str | Path) -> dict[str, Any]:
     counts = {"files": 0, "docs": 0, "modules": 0, "signals": 0,
               "config_params": 0, "datasets": 0, "objectstore_keys": 0, "notebooks": 0}
 
+    # File/ResearchNotebook nodes are keyed by a project-qualified path so two
+    # projects that both contain e.g. main.py don't collapse onto one node.
+    # rel_path keeps the bare path for display.
+    def _fkey(rel: str) -> str:
+        return f"{name}/{rel}"
+
     # Files (+ CONTAINS, HAS_DOC, ResearchNotebook).
     for f in inv["files"]:
         rel, kind = f["path"], f["kind"]
+        fkey = _fkey(rel)
         file_prov = Provenance.extracted(_EXTRACTOR, source_file=rel, confidence=1.0)
-        merge_node("File", "path", rel, {"kind": kind, "project": name}, provenance=file_prov)
-        merge_relationship("Project", "name", name, "CONTAINS", "File", "path", rel,
+        merge_node("File", "path", fkey, {"kind": kind, "project": name, "rel_path": rel},
+                   provenance=file_prov)
+        merge_relationship("Project", "name", name, "CONTAINS", "File", "path", fkey,
                            provenance=file_prov)
         counts["files"] += 1
         if kind == "doc":
-            merge_relationship("Project", "name", name, "HAS_DOC", "File", "path", rel,
+            merge_relationship("Project", "name", name, "HAS_DOC", "File", "path", fkey,
                                provenance=file_prov)
             counts["docs"] += 1
         if kind == "notebook":
-            merge_node("ResearchNotebook", "path", rel, {"project": name}, provenance=file_prov)
+            merge_node("ResearchNotebook", "path", fkey, {"project": name, "rel_path": rel},
+                       provenance=file_prov)
             merge_relationship("Project", "name", name, "CONTAINS",
-                               "ResearchNotebook", "path", rel, provenance=file_prov)
+                               "ResearchNotebook", "path", fkey, provenance=file_prov)
             counts["notebooks"] += 1
 
     # Modules: File DEFINES Module.
@@ -72,7 +81,7 @@ def ingest_project(project_root: str | Path) -> dict[str, Any]:
         mod_name = f"{name}.{m['name']}"
         merge_node("Module", "name", mod_name, {"class_name": m["name"], "project": name},
                    provenance=prov)
-        merge_relationship("File", "path", m["file"], "DEFINES", "Module", "name", mod_name,
+        merge_relationship("File", "path", _fkey(m["file"]), "DEFINES", "Module", "name", mod_name,
                            provenance=prov)
         counts["modules"] += 1
 
@@ -80,7 +89,7 @@ def ingest_project(project_root: str | Path) -> dict[str, Any]:
     for s in inv["signals"]:
         prov = Provenance.extracted(_EXTRACTOR, source_file=s["file"], line=s["line"], confidence=CONF_AST)
         merge_node("Signal", "name", s["name"], {"project": name}, provenance=prov)
-        merge_relationship("File", "path", s["file"], "DEFINES", "Signal", "name", s["name"],
+        merge_relationship("File", "path", _fkey(s["file"]), "DEFINES", "Signal", "name", s["name"],
                            provenance=prov)
         counts["signals"] += 1
 
@@ -129,7 +138,7 @@ def ingest_project(project_root: str | Path) -> dict[str, Any]:
             counts["objectstore_keys"] += 1
         rel_type = "READS" if op["op"] == "read" else "WRITES"
         if op["file"] in notebooks:
-            merge_relationship("ResearchNotebook", "path", op["file"], rel_type,
+            merge_relationship("ResearchNotebook", "path", _fkey(op["file"]), rel_type,
                                "ObjectStoreKey", "key", key, provenance=prov)
         else:
             merge_relationship("Strategy", "name", name, rel_type,

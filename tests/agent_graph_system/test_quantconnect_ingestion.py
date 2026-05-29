@@ -121,3 +121,42 @@ def test_re_ingest_is_idempotent_on_node_count():
     n_after_second = engine._G.number_of_nodes()
     assert first["counts"] == second["counts"]
     assert n_after_first == n_after_second  # merge, not duplicate
+
+
+def _make_project(root: Path, name: str, ticker: str) -> Path:
+    proj = root / name
+    proj.mkdir(parents=True)
+    (proj / "main.py").write_text(
+        f"class {name}Algo:\n    def Initialize(self):\n        self.AddEquity('{ticker}')\n"
+    )
+    (proj / "AGENTS.md").write_text(f"# {name}\n")
+    return proj
+
+
+def test_two_projects_do_not_share_file_nodes(tmp_path):
+    # Both projects have a main.py and AGENTS.md at the same relative paths.
+    proj_a = _make_project(tmp_path, "Alpha", "AAA")
+    proj_b = _make_project(tmp_path, "Beta", "BBB")
+    graph_writer.ingest_project(proj_a)
+    graph_writer.ingest_project(proj_b)
+    g = engine._G
+
+    # Each project's File nodes must be distinct, not merged onto File::main.py.
+    def contained_files(project: str) -> set[str]:
+        out = set()
+        for _, v, d in g.out_edges(f"Project::{project}", data=True):
+            node = g.nodes.get(v, {})
+            if node.get("_label") == "File":
+                out.add(node.get("rel_path", node.get("path")))
+                # the node must belong to the project that contains it
+                assert node.get("project") == project, (
+                    f"{v} contained by {project} but tagged {node.get('project')}"
+                )
+        return out
+
+    assert contained_files("Alpha") == {"main.py", "AGENTS.md"}
+    assert contained_files("Beta") == {"main.py", "AGENTS.md"}
+    # And there is no single shared File::main.py node both point at.
+    main_nodes = [n for n, d in g.nodes(data=True)
+                  if d.get("_label") == "File" and d.get("rel_path") == "main.py"]
+    assert len(main_nodes) == 2
