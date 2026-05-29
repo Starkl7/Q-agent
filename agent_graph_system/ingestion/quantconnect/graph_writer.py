@@ -17,12 +17,13 @@ Relationships: CONTAINS, HAS_DOC, DEFINES, USES, WRITES, READS
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from agent_graph_system.graph.backend import merge_node, merge_relationship
 from agent_graph_system.ingestion.quantconnect.parser import CONF_AST, parse_project
-from agent_graph_system.ontology.provenance import AssertionType, Provenance
+from agent_graph_system.ontology.provenance import Provenance
 
 log = logging.getLogger(__name__)
 
@@ -30,15 +31,33 @@ _EXTRACTOR = "quantconnect_project_extractor"
 
 
 def ingest_project(project_root: str | Path) -> dict[str, Any]:
-    """Parse and write ``project_root`` into the graph. Returns a count summary."""
+    """Parse and write ``project_root`` into the graph. Returns a count summary.
+
+    Every fact written in one call shares a single ``run_ts``, stamped as its
+    provenance ``last_seen`` and recorded on the Project node as
+    ``last_ingest_run``. Re-ingest is merge-only (nothing is deleted), but
+    because stale facts keep their older ``last_seen`` the context pack can tell
+    current facts from ones whose file/config/key disappeared — see
+    ``graph.context_pack``.
+    """
     inv = parse_project(project_root)
     name = inv["project"]
 
-    declared = Provenance.declared(_EXTRACTOR, source_file=name)
+    run_ts = datetime.now(timezone.utc).isoformat()
+
+    def _declared(**kw: Any) -> Provenance:
+        return Provenance.declared(_EXTRACTOR, last_seen=run_ts, **kw)
+
+    def _extracted(**kw: Any) -> Provenance:
+        return Provenance.extracted(_EXTRACTOR, last_seen=run_ts, **kw)
+
+    declared = _declared(source_file=name)
     notebooks = set(inv["notebooks"])
 
     # Project + Strategy (same name) — declared, deterministic from the dir.
-    merge_node("Project", "name", name, {"root": inv["root"]}, provenance=declared)
+    # last_ingest_run marks which facts the current run refreshed.
+    merge_node("Project", "name", name, {"root": inv["root"], "last_ingest_run": run_ts},
+               provenance=declared)
     merge_node(
         "Strategy", "name", name,
         {"strategy_type": "factor", "status": "backtesting"},
@@ -58,7 +77,7 @@ def ingest_project(project_root: str | Path) -> dict[str, Any]:
     for f in inv["files"]:
         rel, kind = f["path"], f["kind"]
         fkey = _fkey(rel)
-        file_prov = Provenance.extracted(_EXTRACTOR, source_file=rel, confidence=1.0)
+        file_prov = _extracted(source_file=rel, confidence=1.0)
         merge_node("File", "path", fkey, {"kind": kind, "project": name, "rel_path": rel},
                    provenance=file_prov)
         merge_relationship("Project", "name", name, "CONTAINS", "File", "path", fkey,
@@ -77,7 +96,7 @@ def ingest_project(project_root: str | Path) -> dict[str, Any]:
 
     # Modules: File DEFINES Module.
     for m in inv["modules"]:
-        prov = Provenance.extracted(_EXTRACTOR, source_file=m["file"], line=m["line"], confidence=CONF_AST)
+        prov = _extracted(source_file=m["file"], line=m["line"], confidence=CONF_AST)
         mod_name = f"{name}.{m['name']}"
         merge_node("Module", "name", mod_name, {"class_name": m["name"], "project": name},
                    provenance=prov)
@@ -87,7 +106,7 @@ def ingest_project(project_root: str | Path) -> dict[str, Any]:
 
     # Signals: File DEFINES Signal (keyed by function name — shared atoms dedupe).
     for s in inv["signals"]:
-        prov = Provenance.extracted(_EXTRACTOR, source_file=s["file"], line=s["line"], confidence=CONF_AST)
+        prov = _extracted(source_file=s["file"], line=s["line"], confidence=CONF_AST)
         merge_node("Signal", "name", s["name"], {"project": name}, provenance=prov)
         merge_relationship("File", "path", _fkey(s["file"]), "DEFINES", "Signal", "name", s["name"],
                            provenance=prov)
@@ -95,7 +114,7 @@ def ingest_project(project_root: str | Path) -> dict[str, Any]:
 
     # Config params.
     for c in inv["config_params"]:
-        prov = Provenance.extracted(_EXTRACTOR, source_file=c["file"], line=c["line"], confidence=CONF_AST)
+        prov = _extracted(source_file=c["file"], line=c["line"], confidence=CONF_AST)
         cp_name = f"{name}.{c['name']}"
         merge_node("ConfigParam", "name", cp_name,
                    {"param": c["name"], "value": c["value"], "project": name}, provenance=prov)
@@ -109,7 +128,7 @@ def ingest_project(project_root: str | Path) -> dict[str, Any]:
         ticker = sub["ticker"]
         if not ticker:
             continue  # dynamic subscription (e.g. loop var) — not a nameable dataset
-        prov = Provenance.extracted(_EXTRACTOR, source_file=sub["file"], line=sub["line"],
+        prov = _extracted(source_file=sub["file"], line=sub["line"],
                                     confidence=sub["confidence"])
         merge_node("Dataset", "name", ticker, {"source": "QuantConnect"}, provenance=prov)
         merge_relationship("Strategy", "name", name, "USES", "Dataset", "name", ticker, provenance=prov)
@@ -118,7 +137,7 @@ def ingest_project(project_root: str | Path) -> dict[str, Any]:
     for data_rel in inv["data_files"]:
         if data_rel in seen_datasets:
             continue
-        prov = Provenance.extracted(_EXTRACTOR, source_file=data_rel, confidence=1.0)
+        prov = _extracted(source_file=data_rel, confidence=1.0)
         merge_node("Dataset", "name", data_rel, {"source": "bundled"}, provenance=prov)
         merge_relationship("Strategy", "name", name, "USES", "Dataset", "name", data_rel, provenance=prov)
         seen_datasets.add(data_rel)
@@ -129,7 +148,7 @@ def ingest_project(project_root: str | Path) -> dict[str, Any]:
     seen_keys: set[str] = set()
     for op in inv["objectstore"]:
         key = op["key"] or f"<dynamic:{op['file']}:{op['line']}>"
-        prov = Provenance.extracted(_EXTRACTOR, source_file=op["file"], line=op["line"],
+        prov = _extracted(source_file=op["file"], line=op["line"],
                                     confidence=op["confidence"])
         if key not in seen_keys:
             merge_node("ObjectStoreKey", "key", key,

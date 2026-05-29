@@ -48,11 +48,19 @@ def build_context_pack(
     """Assemble a structured context pack for ``project`` from the graph."""
     project_id = f"Project::{project}"
     strategy_id = f"Strategy::{project}"
-    if engine.get_node(project_id) is None:
+    project_node = engine.get_node(project_id)
+    if project_node is None:
         raise ProjectNotInGraph(
             f"Project '{project}' is not in the graph — ingest it first "
             f"(ingestion.quantconnect.graph_writer.ingest_project)."
         )
+
+    # Facts refreshed by the latest ingest carry this run marker as last_seen.
+    # Edges from an older run (whose file/config/key has since disappeared) keep
+    # their stale marker and are filtered out below, so the pack reflects the
+    # current project rather than accreting deleted artifacts. A project with no
+    # run marker (legacy ingest) disables filtering — nothing is hidden.
+    run_marker = project_node.get("last_ingest_run")
 
     files: list[str] = []
     docs: list[str] = []
@@ -68,12 +76,23 @@ def build_context_pack(
     touched_nodes: set[str] = {project_id, strategy_id}
     edge_facts: list[tuple[str, dict[str, Any]]] = []
 
+    def _is_current(props: dict[str, Any]) -> bool:
+        """True unless the fact was last seen by an older ingest run."""
+        if run_marker is None:
+            return True
+        last_seen = props.get(f"{PROV_PREFIX}last_seen")
+        return last_seen is None or last_seen == run_marker
+
     def _visit(src_id: str) -> list[tuple[str, str, dict[str, Any]]]:
-        rels = engine.out_relations(src_id)
-        for rel_type, target_id, edge in rels:
+        """Follow only edges refreshed by the latest ingest run."""
+        kept: list[tuple[str, str, dict[str, Any]]] = []
+        for rel_type, target_id, edge in engine.out_relations(src_id):
+            if not _is_current(edge):
+                continue
             touched_nodes.add(target_id)
             edge_facts.append((f"{src_id} -[{rel_type}]-> {target_id}", edge))
-        return rels
+            kept.append((rel_type, target_id, edge))
+        return kept
 
     def _disp(node: dict[str, Any], fallback: str) -> str:
         return node.get("rel_path") or node.get("path") or fallback

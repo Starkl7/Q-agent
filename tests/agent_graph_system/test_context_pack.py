@@ -80,6 +80,27 @@ def test_low_confidence_facts_listed():
     assert all(float(f["confidence"]) < 0.75 for f in pack["low_confidence_facts"])
 
 
+def test_re_ingest_drops_stale_facts(tmp_path):
+    proj = tmp_path / "Demo"
+    proj.mkdir()
+    (proj / "main.py").write_text("class DemoAlgo:\n    pass\n")
+    (proj / "old_helper.py").write_text("class OldHelper:\n    pass\n")
+
+    graph_writer.ingest_project(proj)
+    pack1 = cp.build_context_pack("Demo")
+    assert "old_helper.py" in pack1["important_files"]
+    assert "OldHelper" in pack1["modules"]
+
+    # Delete the helper and re-ingest: the stale file/module must drop out of
+    # the pack even though the writer never deletes graph nodes.
+    (proj / "old_helper.py").unlink()
+    graph_writer.ingest_project(proj)
+    pack2 = cp.build_context_pack("Demo")
+    assert "old_helper.py" not in pack2["important_files"]
+    assert "OldHelper" not in pack2["modules"]
+    assert "main.py" in pack2["important_files"]
+
+
 @pytest.mark.skipif(not _FIXTURE.is_dir(), reason="fixture missing")
 def test_render_markdown_contains_headers():
     graph_writer.ingest_project(_FIXTURE)
