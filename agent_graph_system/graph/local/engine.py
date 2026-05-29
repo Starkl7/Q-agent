@@ -11,9 +11,12 @@ import logging
 import pickle
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import networkx as nx
+
+if TYPE_CHECKING:
+    from agent_graph_system.ontology.provenance import Provenance
 
 log = logging.getLogger(__name__)
 
@@ -52,13 +55,23 @@ _load()
 # Core operations
 # ---------------------------------------------------------------------------
 
-def merge_node(label: str, key: str, key_value: str, props: dict[str, Any] | None = None) -> None:
+def merge_node(
+    label: str,
+    key: str,
+    key_value: str,
+    props: dict[str, Any] | None = None,
+    *,
+    provenance: "Provenance | None" = None,
+) -> None:
     node_id = f"{label}::{key_value}"
     existing = dict(_G.nodes.get(node_id, {}))
     existing.update(props or {})
     existing["_label"] = label
     existing[key] = key_value
     existing["updated_at"] = datetime.utcnow().isoformat()
+    if provenance is not None:
+        from agent_graph_system.ontology.provenance import merge_provenance_props
+        existing.update(merge_provenance_props(existing, provenance))
     _G.add_node(node_id, **existing)
     _save()
 
@@ -68,6 +81,8 @@ def merge_relationship(
     rel_type: str,
     to_label: str, to_key: str, to_val: str,
     props: dict[str, Any] | None = None,
+    *,
+    provenance: "Provenance | None" = None,
 ) -> None:
     from_id = f"{from_label}::{from_val}"
     to_id = f"{to_label}::{to_val}"
@@ -79,11 +94,17 @@ def merge_relationship(
         if data.get("_type") == rel_type and v == to_id:
             data.update(props or {})
             data["updated_at"] = datetime.utcnow().isoformat()
+            if provenance is not None:
+                from agent_graph_system.ontology.provenance import merge_provenance_props
+                data.update(merge_provenance_props(data, provenance))
             _save()
             return
     edge_props = dict(props or {})
     edge_props["_type"] = rel_type
     edge_props["updated_at"] = datetime.utcnow().isoformat()
+    if provenance is not None:
+        from agent_graph_system.ontology.provenance import merge_provenance_props
+        edge_props.update(merge_provenance_props({}, provenance))
     _G.add_edge(from_id, to_id, **edge_props)
     _save()
 
